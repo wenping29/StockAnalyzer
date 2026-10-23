@@ -113,6 +113,11 @@ var app = builder.Build();
 
 // ---------- 数据库初始化 + 定时任务注册 ----------
 // EF.IsDesignTime：dotnet ef 迁移工具会执行本文件，此时跳过运行时初始化
+//
+// 采集调度开关：当部署独立采集器（FundAnalysis.Collector，见 backend/FundAnalysis.Collector）时，
+// 将 Web 的 "Collector:ScheduleEnabled" 设为 false，避免两处重复采集。
+var scheduleEnabled = config.GetValue("Collector:ScheduleEnabled", true);
+
 if (!EF.IsDesignTime)
 {
     using (var scope = app.Services.CreateScope())
@@ -121,21 +126,28 @@ if (!EF.IsDesignTime)
         await db.Database.MigrateAsync();
         await DbSeeder.SeedAsync(scope.ServiceProvider);
 
-        var jobs = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
-        CollectorJobs.Register(jobs);
-
-        // 首次启动（还没有任何行情数据）时，后台队列自动拉取示例标的数据
-        if (!db.StockDailies.Any() && !db.FundNavs.Any())
+        if (scheduleEnabled)
         {
-            var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
-            bg.Enqueue<CollectorService>(s => s.InitialSyncAsync());
+            var jobs = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+            CollectorJobs.Register(jobs);
+
+            // 首次启动（还没有任何行情数据）时，后台队列自动拉取示例标的数据
+            if (!db.StockDailies.Any() && !db.FundNavs.Any())
+            {
+                var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+                bg.Enqueue<CollectorService>(s => s.InitialSyncAsync());
+            }
+
+            // 首次启动时拉取央行流动性数据
+            if (!db.ShiborRates.Any())
+            {
+                var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+                bg.Enqueue<LiquidityService>(s => s.SyncAllAsync());
+            }
         }
-
-        // 首次启动时拉取央行流动性数据
-        if (!db.ShiborRates.Any())
+        else
         {
-            var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
-            bg.Enqueue<LiquidityService>(s => s.SyncAllAsync());
+            app.Logger.LogInformation("Web 端采集调度已关闭（Collector:ScheduleEnabled=false），采集由独立采集器负责");
         }
     }
 }

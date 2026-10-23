@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="FundAnalysis.Collector/FundAnalysis.Collector.csproj" />
+  <Project Path="FundAnalysis.Core/FundAnalysis.Core.csproj" />
   <Project Path="FundAnalysis/FundAnalysis.csproj" />
 </Solution>
