@@ -148,7 +148,7 @@ public class AnalysisService(AppDbContext db)
             if (basic.Type == SymbolTypes.Fund)
             {
                 var navs = await db.FundNavs.Where(x => x.FundCode == symbol)
-                    .OrderByDescending(x => x.Date).Take(21).ToListAsync();
+                    .OrderByDescending(x => x.Date).Take(22).ToListAsync();
                 navs.Reverse();
                 result.Add(new WatchlistItemDto(symbol, basic.Name, basic.Type,
                     navs.Count > 0 ? navs[^1].Nav : null,
@@ -159,7 +159,7 @@ public class AnalysisService(AppDbContext db)
             }
 
             var dailies = await db.StockDailies.Where(x => x.Symbol == symbol)
-                .OrderByDescending(x => x.Date).Take(21).ToListAsync();
+                .OrderByDescending(x => x.Date).Take(22).ToListAsync();
             dailies.Reverse();
 
             var last5Main = await db.MoneyFlowDailies.Where(x => x.Symbol == symbol)
@@ -176,11 +176,13 @@ public class AnalysisService(AppDbContext db)
 
     private async Task<List<KLinePointDto>> DailyKLineAsync(string symbol, int limit)
     {
+        // TakeLast 无法翻译成 SQL：倒序取 N 条后在内存反转
         var rows = await db.StockDailies
             .Where(x => x.Symbol == symbol)
-            .OrderBy(x => x.Date)
-            .TakeLast(limit)
+            .OrderByDescending(x => x.Date)
+            .Take(limit)
             .ToListAsync();
+        rows.Reverse();
         return rows.Select(r => new KLinePointDto(
             r.Date.ToString("yyyy-MM-dd"), r.Open, r.High, r.Low, r.Close, r.Volume, r.ChangePct)).ToList();
     }

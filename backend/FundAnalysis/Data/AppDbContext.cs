@@ -17,6 +17,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     {
         base.OnModelCreating(b);
 
+        // Npgsql 默认把 DateTime 映射为 timestamp with time zone（要求 UTC 时间），
+        // 本系统统一使用本地时间（DateTime.Now），改为 timestamp without time zone 保持行为与其他库一致
+        if (Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+        {
+            foreach (var entityType in b.Model.GetEntityTypes())
+                foreach (var property in entityType.GetProperties())
+                    if (property.ClrType == typeof(DateTime))
+                        property.SetColumnType("timestamp without time zone");
+        }
+
         b.Entity<StockBasic>(e =>
         {
             e.HasIndex(x => x.Symbol).IsUnique();

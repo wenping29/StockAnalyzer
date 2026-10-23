@@ -15,15 +15,17 @@ using Microsoft.OpenApi;
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
+// 支持命令行覆盖配置（例如：dotnet run -- --Database:Provider mysql）
+builder.Configuration.AddCommandLine(args);
+
 // ---------- MVC + 中文友好 JSON ----------
 builder.Services.AddControllers().AddJsonOptions(o =>
 {
     o.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
 });
 
-// ---------- EF Core (SQLite) ----------
-builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlite(config.GetConnectionString("Default")));
+// ---------- EF Core（多数据库，按配置切换，默认 SQLite） ----------
+builder.Services.AddDbContext<AppDbContext>(opt => opt.UseDatabase(config));
 
 // ---------- Identity + JWT ----------
 builder.Services.AddIdentityCore<AppUser>(opt =>

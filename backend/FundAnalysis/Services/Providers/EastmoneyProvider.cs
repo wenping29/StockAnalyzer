@@ -149,7 +149,9 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
 
     public async Task<List<MoneyFlowItem>> FetchMoneyFlowAsync(string symbol, int secMarket, int days, CancellationToken ct = default)
     {
-        var url = $"https://push2.eastmoney.com/api/qt/stock/fflow/kline/get?lmt={days}&klt=101&secid={secMarket}.{symbol}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65";
+        // 注意：历史资金流在 push2his 的 daykline 接口；push2 的 fflow/kline 只有当天
+        // 行格式：日期,主力,小单,中单,大单,超大单,主力占比,小单占比,中单占比,大单占比,超大单占比,收盘,涨跌幅
+        var url = $"https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt={days}&klt=101&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65&secid={secMarket}.{symbol}";
         using var client = NewClient();
         using var doc = JsonDocument.Parse(await client.GetStringAsync(url, ct));
         var list = new List<MoneyFlowItem>();
@@ -176,30 +178,39 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
 
     public async Task<List<FundNavItem>> FetchFundNavAsync(string fundCode, int pageSize, CancellationToken ct = default)
     {
-        var url = $"https://api.fund.eastmoney.com/f10/lsjz?fundCode={fundCode}&pageIndex=1&pageSize={pageSize}&startDate=&endDate=";
-        using var client = NewClient();
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        // 该接口要求携带 Referer，否则返回空
-        request.Headers.Referrer = new Uri($"https://fundf10.eastmoney.com/jjjz_{fundCode}.html");
-        using var response = await client.SendAsync(request, ct);
-        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-
         var list = new List<FundNavItem>();
-        if (!doc.RootElement.TryGetProperty("Data", out var data) || data.ValueKind == JsonValueKind.Null)
-            return list;
-        if (!data.TryGetProperty("LSJZList", out var rows) || rows.ValueKind != JsonValueKind.Array)
-            return list;
+        using var client = NewClient();
 
-        foreach (var row in rows.EnumerateArray())
+        // 该接口单页上限 49 条（超过返回 Data:null），且每页实际返回约 20 条，按拿满为止翻页
+        const int step = 49;
+        var page = 1;
+        while (list.Count < pageSize && page <= 100)
         {
-            var dateStr = GetString(row, "FSRQ");
-            if (string.IsNullOrWhiteSpace(dateStr)) continue;
-            if (!DateTime.TryParse(dateStr, Cn, DateTimeStyles.None, out var date)) continue;
-            list.Add(new FundNavItem(
-                Date: date,
-                Nav: Num(GetString(row, "DWJZ")),
-                AccNav: Num(GetString(row, "LJJZ")),
-                ChangePct: Num(GetString(row, "JZZZL"))));
+            var url = $"https://api.fund.eastmoney.com/f10/lsjz?fundCode={fundCode}&pageIndex={page}&pageSize={step}&startDate=&endDate=";
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            // 该接口要求携带 Referer，否则返回空
+            request.Headers.Referrer = new Uri($"https://fundf10.eastmoney.com/jjjz_{fundCode}.html");
+            using var response = await client.SendAsync(request, ct);
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+
+            if (!doc.RootElement.TryGetProperty("Data", out var data) || data.ValueKind == JsonValueKind.Null)
+                break;
+            if (!data.TryGetProperty("LSJZList", out var rows) || rows.ValueKind != JsonValueKind.Array || rows.GetArrayLength() == 0)
+                break;
+
+            foreach (var row in rows.EnumerateArray())
+            {
+                var dateStr = GetString(row, "FSRQ");
+                if (string.IsNullOrWhiteSpace(dateStr)) continue;
+                if (!DateTime.TryParse(dateStr, Cn, DateTimeStyles.None, out var date)) continue;
+                list.Add(new FundNavItem(
+                    Date: date,
+                    Nav: Num(GetString(row, "DWJZ")),
+                    AccNav: Num(GetString(row, "LJJZ")),
+                    ChangePct: Num(GetString(row, "JZZZL"))));
+            }
+            await Task.Delay(200, ct);
+            page++;
         }
         return list;
     }
