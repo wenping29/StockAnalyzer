@@ -76,6 +76,7 @@ builder.Services.AddHttpClient("eastmoney");
 builder.Services.AddScoped<IQuoteProvider, EastmoneyProvider>();
 builder.Services.AddScoped<CollectorService>();
 builder.Services.AddScoped<AnalysisService>();
+builder.Services.AddScoped<LiquidityService>();
 builder.Services.AddScoped<TokenService>();
 
 // ---------- Swagger + CORS ----------
@@ -128,6 +129,13 @@ if (!EF.IsDesignTime)
         {
             var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
             bg.Enqueue<CollectorService>(s => s.InitialSyncAsync());
+        }
+
+        // 首次启动时拉取央行流动性数据
+        if (!db.ShiborRates.Any())
+        {
+            var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+            bg.Enqueue<LiquidityService>(s => s.SyncAllAsync());
         }
     }
 }

@@ -1,6 +1,7 @@
 using FundAnalysis.Data;
 using FundAnalysis.Models;
 using FundAnalysis.Services.Providers;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 
 namespace FundAnalysis.Services;
@@ -13,6 +14,7 @@ public class CollectorService(AppDbContext db, IQuoteProvider provider, IConfigu
     private const int MinuteBars = 100;     // 约 2 个交易日的 5 分钟线
 
     /// <summary>首次启动的初始化任务：注册示例标的并拉取其全部数据。</summary>
+    [DisableConcurrentExecution(timeoutInSeconds: 600)]
     public async Task InitialSyncAsync()
     {
         foreach (var symbol in GetSampleSymbols())
@@ -77,6 +79,7 @@ public class CollectorService(AppDbContext db, IQuoteProvider provider, IConfigu
     }
 
     /// <summary>定时任务：同步所有用户自选 + 示例标的的日线、资金流、基金净值。</summary>
+    [DisableConcurrentExecution(timeoutInSeconds: 600)]
     public async Task SyncWatchlistDailyAsync()
     {
         foreach (var symbol in GetAllSymbols())

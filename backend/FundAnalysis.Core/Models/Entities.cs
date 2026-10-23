@@ -91,3 +91,51 @@ public class WatchlistItem
 
     public AppUser? User { get; set; }
 }
+
+// ---------- 央行流动性 ----------
+
+/// <summary>Shibor 日度利率。Period 如"隔夜(O/N)"、"1周(1W)"。</summary>
+public class ShiborRate
+{
+    public long Id { get; set; }
+    public string Period { get; set; } = "";
+    public DateTime Date { get; set; }
+    /// <summary>利率（%）。</summary>
+    public double Rate { get; set; }
+    /// <summary>较上日变动（基点 bp）。</summary>
+    public double ChangeBp { get; set; }
+}
+
+/// <summary>货币供应量（月度）。单位：亿元。YoY 为同比增速（%）。</summary>
+public class MoneySupply
+{
+    public long Id { get; set; }
+    /// <summary>数据月份（取每月 1 日）。</summary>
+    public DateTime Month { get; set; }
+    public double M2 { get; set; }
+    public double M1 { get; set; }
+    public double M0 { get; set; }
+    public double M2YoY { get; set; }
+    public double M1YoY { get; set; }
+    public double M0YoY { get; set; }
+}
+
+/// <summary>存款准备金率调整历史（大型/中小型存款类金融机构）。</summary>
+public class ReserveRatio
+{
+    public long Id { get; set; }
+    public DateTime Date { get; set; }
+    /// <summary>大型机构调整后（%）。</summary>
+    public double Large { get; set; }
+    /// <summary>中小型机构调整后（%）。</summary>
+    public double Small { get; set; }
+}
+
+/// <summary>LPR 报价历史（月度 20 日）。</summary>
+public class LprRate
+{
+    public long Id { get; set; }
+    public DateTime Date { get; set; }
+    public double Lpr1Y { get; set; }
+    public double Lpr5Y { get; set; }
+}

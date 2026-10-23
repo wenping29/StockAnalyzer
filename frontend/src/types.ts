@@ -87,3 +87,70 @@ export interface AdminUser {
   enabled: boolean
   createdAt: string
 }
+
+// ---------- 央行流动性 ----------
+
+export interface LiquidityOverview {
+  latestShiborDate: string
+  shiborOn: number
+  shiborOnChangeBp: number
+  shibor1W: number
+  shibor1WChangeBp: number
+  latestSupplyMonth: string
+  m2YoY: number
+  m1YoY: number
+  m0YoY: number
+  lpr1Y: number
+  lpr5Y: number
+  latestLprDate: string
+  reserveLarge: number
+  reserveSmall: number
+  latestReserveDate: string
+}
+
+export interface ShiborPoint {
+  date: string
+  on: number
+  w1: number
+  w2: number
+  m1: number
+}
+
+export interface ShiborData {
+  points: ShiborPoint[]
+}
+
+export interface MoneySupplyPoint {
+  month: string
+  m2: number
+  m1: number
+  m0: number
+  m2YoY: number
+  m1YoY: number
+  m0YoY: number
+}
+
+export interface MoneySupplyData {
+  points: MoneySupplyPoint[]
+}
+
+export interface ReserveRatioItem {
+  date: string
+  large: number
+  small: number
+  change: number | null
+}
+
+export interface ReserveRatioData {
+  items: ReserveRatioItem[]
+}
+
+export interface LprItem {
+  date: string
+  lpr1Y: number
+  lpr5Y: number
+}
+
+export interface LprData {
+  items: LprItem[]
+}

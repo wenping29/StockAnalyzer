@@ -19,5 +19,9 @@ public static class CollectorJobs
         // 交易时段每 5 分钟同步 5 分钟线（9:00-15:55）
         jobs.AddOrUpdate<CollectorService>(
             "minute-sync", s => s.SyncWatchlistMinutesAsync(), "*/5 9-15 * * 1-5");
+
+        // 央行流动性数据（Shibor/货币供应/存准率/LPR）：每日 20:00
+        jobs.AddOrUpdate<LiquidityService>(
+            "liquidity-sync", s => s.SyncAllAsync(), "0 20 * * *");
     }
 }

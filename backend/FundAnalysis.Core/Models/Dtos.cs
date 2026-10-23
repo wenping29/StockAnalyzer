@@ -47,3 +47,32 @@ public record AdminUserDto(string Id, string UserName, string? Email, string Rol
 public record UpdateRoleRequest(string Role);
 
 public record UpdateEnabledRequest(bool Enabled);
+
+// ---------- 央行流动性 ----------
+
+public record LiquidityCardDto(string Label, string Value, string? Sub, double? TrendPct);
+
+public record ShiborPointDto(string Date, double On, double W1, double W2, double M1);
+
+public record ShiborResponse(List<ShiborPointDto> Points);
+
+public record MoneySupplyPointDto(string Month, double M2, double M1, double M0, double M2YoY, double M1YoY, double M0YoY);
+
+public record MoneySupplyResponse(List<MoneySupplyPointDto> Points);
+
+public record ReserveRatioItemDto(string Date, double Large, double Small, double? Change);
+
+public record ReserveRatioResponse(List<ReserveRatioItemDto> Items);
+
+public record LprItemDto(string Date, double Lpr1Y, double Lpr5Y);
+
+public record LprResponse(List<LprItemDto> Items);
+
+public record LiquidityOverviewDto(
+    string LatestShiborDate,
+    double ShiborOn, double ShiborOnChangeBp,
+    double Shibor1W, double Shibor1WChangeBp,
+    string LatestSupplyMonth,
+    double M2YoY, double M1YoY, double M0YoY,
+    double Lpr1Y, double Lpr5Y, string LatestLprDate,
+    double ReserveLarge, double ReserveSmall, string LatestReserveDate);

@@ -45,6 +45,7 @@ function logout() {
       <div class="brand" @click="router.push('/')">📈 基金/股票资金流分析系统</div>
       <div class="nav">
         <router-link to="/">自选</router-link>
+        <router-link to="/liquidity">流动性</router-link>
         <router-link v-if="auth.isAdmin" to="/admin">管理后台</router-link>
       </div>
       <div class="spacer" />

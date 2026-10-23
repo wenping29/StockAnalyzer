@@ -8,23 +8,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FundAnalysis.Core\FundAnalysis.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 认证与 API 文档（EF 提供程序与 Identity 已移至 FundAnalysis.Core） -->
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
     <PackageReference Include="Hangfire.InMemory" Version="1.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.13" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.13" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
+    <!-- 迁移工具（dotnet ef）以 Web 为启动项目时需要 -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.13" />
-    <PackageReference Include="MySql.EntityFrameworkCore" Version="10.0.12" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
-    <PackageReference Include="Oracle.EntityFrameworkCore" Version="10.23.26400" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
-    <!-- 提升 Hangfire.SQLite 的传递依赖，消除 NU1902 漏洞警告 -->
-    <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
 </Project>

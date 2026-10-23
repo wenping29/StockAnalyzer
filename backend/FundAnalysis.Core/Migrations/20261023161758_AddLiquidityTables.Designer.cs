@@ -3,6 +3,7 @@ using System;
 using FundAnalysis.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FundAnalysis.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261023161758_AddLiquidityTables")]
+    partial class AddLiquidityTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
@@ -114,6 +117,29 @@ namespace FundAnalysis.Migrations
                     b.ToTable("FundNavs");
                 });
 
+            modelBuilder.Entity("FundAnalysis.Models.LprRate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Lpr1Y")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Lpr5Y")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date")
+                        .IsUnique();
+
+                    b.ToTable("LprRates");
+                });
+
             modelBuilder.Entity("FundAnalysis.Models.MoneyFlowDaily", b =>
                 {
                     b.Property<long>("Id")
@@ -145,6 +171,93 @@ namespace FundAnalysis.Migrations
                         .IsUnique();
 
                     b.ToTable("MoneyFlowDailies");
+                });
+
+            modelBuilder.Entity("FundAnalysis.Models.MoneySupply", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("M0")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("M0YoY")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("M1")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("M1YoY")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("M2")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("M2YoY")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("Month")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Month")
+                        .IsUnique();
+
+                    b.ToTable("MoneySupplies");
+                });
+
+            modelBuilder.Entity("FundAnalysis.Models.ReserveRatio", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Large")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Small")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date")
+                        .IsUnique();
+
+                    b.ToTable("ReserveRatios");
+                });
+
+            modelBuilder.Entity("FundAnalysis.Models.ShiborRate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("ChangeBp")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Rate")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("Period", "Date")
+                        .IsUnique();
+
+                    b.ToTable("ShiborRates");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.StockBasic", b =>

@@ -12,6 +12,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<FundNav> FundNavs => Set<FundNav>();
     public DbSet<MoneyFlowDaily> MoneyFlowDailies => Set<MoneyFlowDaily>();
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
+    public DbSet<ShiborRate> ShiborRates => Set<ShiborRate>();
+    public DbSet<MoneySupply> MoneySupplies => Set<MoneySupply>();
+    public DbSet<ReserveRatio> ReserveRatios => Set<ReserveRatio>();
+    public DbSet<LprRate> LprRates => Set<LprRate>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -60,6 +64,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         {
             e.HasIndex(x => new { x.UserId, x.Symbol }).IsUnique();
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ShiborRate>(e =>
+        {
+            e.HasIndex(x => new { x.Period, x.Date }).IsUnique();
+            e.HasIndex(x => x.Date);
+        });
+
+        b.Entity<MoneySupply>(e =>
+        {
+            e.HasIndex(x => x.Month).IsUnique();
+        });
+
+        b.Entity<ReserveRatio>(e =>
+        {
+            e.HasIndex(x => x.Date).IsUnique();
+        });
+
+        b.Entity<LprRate>(e =>
+        {
+            e.HasIndex(x => x.Date).IsUnique();
         });
     }
 }
