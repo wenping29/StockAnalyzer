@@ -1,0 +1,43 @@
+# 服务器部署示例：MySQL + 独立采集器（daemon 常驻模式）
+# 用法：docker compose -f docker-compose.yml up -d
+# Web 端（FundAnalysis）部署在另一台机器或同机，连接同一个 MySQL 即可。
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: change_me_root
+      MYSQL_DATABASE: fund_analysis
+      MYSQL_USER: fund
+      MYSQL_PASSWORD: change_me
+    volumes:
+      - db-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+
+  collector:
+    build:
+      context: .
+      dockerfile: FundAnalysis.Collector/Dockerfile
+    image: fund-collector
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # 环境变量覆盖 appsettings（连接串指向 compose 内的 db 服务）
+      Database__Provider: mysql
+      ConnectionStrings__Default: "Server=db;Port=3306;Database=fund_analysis;User=fund;Password=change_me;"
+      Collector__SampleSymbols__0: "600519"
+      Collector__SampleSymbols__1: "000001"
+      Collector__SampleSymbols__2: "300750"
+      Collector__SampleSymbols__3: "510300"
+      Collector__SampleSymbols__4: "110022"
+    command: ["--mode=daemon"]
+
+volumes:
+  db-data:

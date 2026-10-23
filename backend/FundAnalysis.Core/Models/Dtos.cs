@@ -50,6 +50,30 @@ public record UpdateEnabledRequest(bool Enabled);
 
 // ---------- 央行流动性 ----------
 
+public record MarketIndexDto(string Code, string Name, string Market, double Price, double ChangePct, List<double> Trend);
+
+/// <summary>两市成交量（沪=上证指数成交额，深=深证综指成交额）。单位：亿元。</summary>
+public record MarketVolumePointDto(string Date, double Sh, double Sz, double Total);
+
+public record MarketVolumeDto(
+    double TodayAmount,
+    double YesterdayAmount,
+    double? ChangePct,
+    List<MarketVolumePointDto> Points);
+
+/// <summary>沪深港通（北上/南下）资金。单位：亿元。</summary>
+public record HsgtPointDto(string Date, double NorthAmount, double SouthNetInflow, double SouthAmount);
+
+public record HsgtFlowDto(
+    /// <summary>北向今日成交额（净流入自 2024-08 起交易所停止披露）。</summary>
+    double NorthTodayAmount,
+    double NorthYesterdayAmount,
+    double? NorthAmountChangePct,
+    /// <summary>南向今日净流入（负值为净流出）。</summary>
+    double SouthTodayNetInflow,
+    double SouthYesterdayNetInflow,
+    List<HsgtPointDto> Points);
+
 public record LiquidityCardDto(string Label, string Value, string? Sub, double? TrendPct);
 
 public record ShiborPointDto(string Date, double On, double W1, double W2, double M1);

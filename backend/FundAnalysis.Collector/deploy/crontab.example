@@ -1,0 +1,19 @@
+# 服务器 crontab 示例（once 模式：每次运行即采集，跑完退出）
+# 安装：crontab -e  然后粘贴以下内容（按需调整镜像名与数据库连接）
+#
+# 方式一：镜像常驻在服务器，cron 调 docker run --rm（数据库地址按实际修改）
+#
+# 交易日 16:35 全量采集（日线 + 资金流 + 基金净值 + 央行流动性）
+35 16 * * 1-5 docker run --rm \
+  -e Database__Provider=mysql \
+  -e ConnectionStrings__Default="Server=数据库地址;Port=3306;Database=fund_analysis;User=fund;Password=change_me;" \
+  fund-collector --jobs=daily >> /var/log/fund-collector.log 2>&1
+#
+# 交易时段每 5 分钟采集分钟线（9:00-15:55）
+*/5 9-15 * * 1-5 docker run --rm \
+  -e Database__Provider=mysql \
+  -e ConnectionStrings__Default="Server=数据库地址;Port=3306;Database=fund_analysis;User=fund;Password=change_me;" \
+  fund-collector --jobs=minutes >> /var/log/fund-collector.log 2>&1
+#
+# 每周日 8:00 同步央行流动性（Shibor 周末无数据，可省）
+# 0 8 * * 0 docker run --rm fund-collector --jobs=liquidity

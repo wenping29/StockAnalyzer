@@ -111,7 +111,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("FundCode", "Date")
                         .IsUnique();
 
-                    b.ToTable("FundNavs");
+                    b.ToTable("FundNavs", (string)null);
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.LprRate", b =>
@@ -134,7 +134,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Date")
                         .IsUnique();
 
-                    b.ToTable("LprRates");
+                    b.ToTable("LprRates", (string)null);
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.MoneyFlowDaily", b =>
@@ -167,7 +167,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Symbol", "Date")
                         .IsUnique();
 
-                    b.ToTable("MoneyFlowDailies");
+                    b.ToTable("MoneyFlowDailies", (string)null);
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.MoneySupply", b =>
@@ -202,7 +202,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Month")
                         .IsUnique();
 
-                    b.ToTable("MoneySupplies");
+                    b.ToTable("MoneySupplies", (string)null);
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.ReserveRatio", b =>
@@ -225,7 +225,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Date")
                         .IsUnique();
 
-                    b.ToTable("ReserveRatios");
+                    b.ToTable("ReserveRatios", (string)null);
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.ShiborRate", b =>
@@ -254,7 +254,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Period", "Date")
                         .IsUnique();
 
-                    b.ToTable("ShiborRates");
+                    b.ToTable("ShiborRates", (string)null);
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.StockBasic", b =>
@@ -288,7 +288,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Symbol")
                         .IsUnique();
 
-                    b.ToTable("StockBasics");
+                    b.ToTable("StockBasics", (string)null);
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.StockDaily", b =>
@@ -332,7 +332,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Symbol", "Date")
                         .IsUnique();
 
-                    b.ToTable("StockDailies");
+                    b.ToTable("StockDailies", (string)null);
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.StockMinute", b =>
@@ -370,7 +370,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Symbol", "Time")
                         .IsUnique();
 
-                    b.ToTable("StockMinutes");
+                    b.ToTable("StockMinutes", (string)null);
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.WatchlistItem", b =>
@@ -395,7 +395,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("UserId", "Symbol")
                         .IsUnique();
 
-                    b.ToTable("WatchlistItems");
+                    b.ToTable("WatchlistItems", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>

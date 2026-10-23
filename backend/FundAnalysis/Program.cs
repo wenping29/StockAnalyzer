@@ -77,6 +77,7 @@ builder.Services.AddScoped<IQuoteProvider, EastmoneyProvider>();
 builder.Services.AddScoped<CollectorService>();
 builder.Services.AddScoped<AnalysisService>();
 builder.Services.AddScoped<LiquidityService>();
+builder.Services.AddScoped<HsgtService>();
 builder.Services.AddScoped<TokenService>();
 
 // ---------- Swagger + CORS ----------
@@ -108,6 +109,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 builder.Services.AddCors(o => o.AddPolicy("all",
     p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+builder.Services.AddMemoryCache();
 
 var app = builder.Build();
 
