@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { MarketIndex, MarketVolume, WatchlistItem, LiquidityOverview } from '../types'
-import { fetchMarketOverview, fetchMarketVolume, fetchWatchlist } from '../api/quote'
+import type { MarketIndex, MarketVolume, HsgtFlow, WatchlistItem, LiquidityOverview } from '../types'
+import { fetchMarketOverview, fetchMarketVolume, fetchHsgtFlow, fetchWatchlist } from '../api/quote'
 import { fetchLiquidityOverview } from '../api/liquidity'
 import SparkLine from '../components/SparkLine.vue'
 import VolumeBarChart from '../components/VolumeBarChart.vue'
+import HsgtChart from '../components/HsgtChart.vue'
 
 const router = useRouter()
 
 const indices = ref<MarketIndex[]>([])
 const volume = ref<MarketVolume | null>(null)
+const hsgt = ref<HsgtFlow | null>(null)
 const watchlist = ref<WatchlistItem[]>([])
 const liquidity = ref<LiquidityOverview | null>(null)
 const loading = ref(true)
@@ -45,14 +47,16 @@ function fmtPct(v: number | null | undefined) {
 async function load() {
   loading.value = true
   try {
-    const [idx, vol, wl, liq] = await Promise.all([
+    const [idx, vol, hf, wl, liq] = await Promise.all([
       fetchMarketOverview(),
       fetchMarketVolume(30).catch(() => null),
+      fetchHsgtFlow(30).catch(() => null),
       fetchWatchlist().catch(() => [] as WatchlistItem[]),
       fetchLiquidityOverview().catch(() => null),
     ])
     indices.value = idx
     volume.value = vol
+    hsgt.value = hf
     watchlist.value = wl
     liquidity.value = liq
   } finally {
@@ -95,6 +99,26 @@ onMounted(load)
         </span>
       </div>
       <VolumeBarChart :points="volume.points" />
+    </div>
+
+    <!-- 北向 / 南向资金 -->
+    <div class="page-card" v-if="hsgt && hsgt.points.length">
+      <div class="card-head hsgt-head">
+        <div class="hsgt-item">
+          <span class="hsgt-label">北向（沪深股通）今日成交</span>
+          <span class="vol-amount" :class="pctClass(hsgt.northAmountChangePct)">{{ hsgt.northTodayAmount.toFixed(0) }} 亿</span>
+          <span class="vol-change" v-if="hsgt.northAmountChangePct != null">
+            较昨日 <b :class="pctClass(hsgt.northAmountChangePct)">+{{ hsgt.northAmountChangePct.toFixed(1) }}%</b>
+          </span>
+          <span class="hsgt-note">净流入自 2024-08 起停止披露，以成交额衡量活跃度</span>
+        </div>
+        <div class="hsgt-item">
+          <span class="hsgt-label">南向（港股通）今日{{ hsgt.southTodayNetInflow >= 0 ? '净流入' : '净流出' }}</span>
+          <span class="vol-amount" :class="pctClass(hsgt.southTodayNetInflow)">{{ Math.abs(hsgt.southTodayNetInflow).toFixed(1) }} 亿</span>
+          <span class="vol-change">昨日 {{ hsgt.southYesterdayNetInflow >= 0 ? '净流入 ' : '净流出 ' }}{{ Math.abs(hsgt.southYesterdayNetInflow).toFixed(1) }} 亿</span>
+        </div>
+      </div>
+      <HsgtChart :points="hsgt.points" />
     </div>
 
     <div class="two-col">
@@ -199,6 +223,10 @@ onMounted(load)
 .card-head h4 { font-size: 15px; }
 .vol-amount { font-size: 20px; margin-left: 6px; }
 .vol-change { font-size: 13px; color: #909399; }
+.hsgt-head { justify-content: flex-start; gap: 48px; }
+.hsgt-item { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.hsgt-label { font-size: 14px; font-weight: 600; }
+.hsgt-note { font-size: 12px; color: #c0c4cc; }
 .mini-grid { display: flex; flex-wrap: wrap; }
 .mini-item { flex: 1; min-width: 88px; text-align: center; padding: 8px 4px; }
 .mini-value { font-size: 20px; font-weight: 600; }

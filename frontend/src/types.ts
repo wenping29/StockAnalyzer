@@ -113,6 +113,22 @@ export interface MarketVolume {
   points: MarketVolumePoint[]
 }
 
+export interface HsgtPoint {
+  date: string
+  northAmount: number
+  southNetInflow: number
+  southAmount: number
+}
+
+export interface HsgtFlow {
+  northTodayAmount: number
+  northYesterdayAmount: number
+  northAmountChangePct: number | null
+  southTodayNetInflow: number
+  southYesterdayNetInflow: number
+  points: HsgtPoint[]
+}
+
 export interface LiquidityOverview {
   latestShiborDate: string
   shiborOn: number

@@ -15,6 +15,37 @@ public class QuoteController(
     AppDbContext db, AnalysisService analysis, IQuoteProvider provider, IMemoryCache cache, HsgtService hsgt) : ControllerBase
 {
     /// <summary>
+    /// 人民币汇率趋势（离岸 USDCNH，东财 secid 133）。数值上升 = 人民币贬值，下降 = 升值。
+    /// </summary>
+    [Authorize]
+    [HttpGet("fx-rate")]
+    public async Task<IActionResult> FxRate([FromQuery] int days = 90)
+    {
+        days = Math.Clamp(days, 30, 365);
+        const string cacheKey = "fx-rate";
+        if (cache.TryGetValue(cacheKey, out FxRateDto? cached) && cached is not null)
+            return Ok(cached);
+
+        var bars = await provider.FetchKLineAsync("USDCNH", 133, 101, days);
+        if (bars.Count == 0)
+            return Ok(new FxRateDto(0, "-", 0, null, []));
+
+        var points = bars.Select(b => new FxPointDto(b.Time.ToString("yyyy-MM-dd"), b.Close)).ToList();
+        var last = bars[^1];
+        var dto = new FxRateDto(
+            Latest: last.Close,
+            LatestDate: last.Time.ToString("yyyy-MM-dd"),
+            DayChangePct: last.ChangePct,
+            MonthChangePct: bars.Count >= 21 && bars[^21].Close > 0
+                ? Math.Round((last.Close / bars[^21].Close - 1) * 100, 2)
+                : null,
+            Points: points);
+
+        cache.Set(cacheKey, dto, TimeSpan.FromMinutes(5));
+        return Ok(dto);
+    }
+
+    /// <summary>
     /// 沪深港通资金（北上/南下）：北向成交额（净流入 2024-08 起停止披露）、南向净流入/流出，近 N 日趋势。
     /// </summary>
     [Authorize]

@@ -61,6 +61,16 @@ public record MarketVolumeDto(
     double? ChangePct,
     List<MarketVolumePointDto> Points);
 
+/// <summary>人民币汇率（离岸 USDCNH）。数值上升 = 人民币贬值。</summary>
+public record FxPointDto(string Date, double Rate);
+
+public record FxRateDto(
+    double Latest,
+    string LatestDate,
+    double DayChangePct,
+    double? MonthChangePct,
+    List<FxPointDto> Points);
+
 /// <summary>沪深港通（北上/南下）资金。单位：亿元。</summary>
 public record HsgtPointDto(string Date, double NorthAmount, double SouthNetInflow, double SouthAmount);
 
