@@ -26,19 +26,14 @@
 hs_err_pid*
 
 .vscode
+ 
 
-scripts/.last
-config/.env_target.js
-src/routes/**/.*.js
-
-node_modules/
-build/
-webpack.dev.server.js
-/dev-proxy.js
-.eslintrc.yml
-package-lock.json
-pnpm-lock.yaml
-.DS_Store
-.env_target
-yarn.lock
-jsconfig.local.json
+frontend/node_modules/
+frontend/build/
+frontend/.eslintrc.yml
+frontend/package-lock.json
+frontend/pnpm-lock.yaml
+frontend/.DS_Store
+frontend/.env_target
+frontend/yarn.lock
+frontend/jsconfig.local.json
