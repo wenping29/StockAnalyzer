@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { MarketIndex, MarketVolume, HsgtFlow, WatchlistItem, LiquidityOverview } from '../types'
-import { fetchMarketOverview, fetchMarketVolume, fetchHsgtFlow, fetchWatchlist } from '../api/quote'
+import type { MarketIndex, MarketVolume, HsgtFlow, FxRate, Us10y, CnBond, WatchlistItem, LiquidityOverview } from '../types'
+import { fetchMarketOverview, fetchMarketVolume, fetchHsgtFlow, fetchFxRate, fetchUs10y, fetchCnBond, fetchWatchlist } from '../api/quote'
 import { fetchLiquidityOverview } from '../api/liquidity'
 import SparkLine from '../components/SparkLine.vue'
 import VolumeBarChart from '../components/VolumeBarChart.vue'
 import HsgtChart from '../components/HsgtChart.vue'
+import MultiLineChart from '../components/MultiLineChart.vue'
 
 const router = useRouter()
 
 const indices = ref<MarketIndex[]>([])
 const volume = ref<MarketVolume | null>(null)
 const hsgt = ref<HsgtFlow | null>(null)
+const fx = ref<FxRate | null>(null)
+const us10y = ref<Us10y | null>(null)
+const cnBond = ref<CnBond | null>(null)
 const watchlist = ref<WatchlistItem[]>([])
 const liquidity = ref<LiquidityOverview | null>(null)
 const loading = ref(true)
@@ -47,16 +51,22 @@ function fmtPct(v: number | null | undefined) {
 async function load() {
   loading.value = true
   try {
-    const [idx, vol, hf, wl, liq] = await Promise.all([
+    const [idx, vol, hf, fxr, u10, cnb, wl, liq] = await Promise.all([
       fetchMarketOverview(),
       fetchMarketVolume(30).catch(() => null),
       fetchHsgtFlow(30).catch(() => null),
+      fetchFxRate(90).catch(() => null),
+      fetchUs10y(90).catch(() => null),
+      fetchCnBond(90).catch(() => null),
       fetchWatchlist().catch(() => [] as WatchlistItem[]),
       fetchLiquidityOverview().catch(() => null),
     ])
     indices.value = idx
     volume.value = vol
     hsgt.value = hf
+    fx.value = fxr
+    us10y.value = u10
+    cnBond.value = cnb
     watchlist.value = wl
     liquidity.value = liq
   } finally {
@@ -119,6 +129,62 @@ onMounted(load)
         </div>
       </div>
       <HsgtChart :points="hsgt.points" />
+    </div>
+
+    <!-- 汇率与利率（三列） -->
+    <div class="rate-row">
+      <div class="page-card" v-if="fx && fx.points.length">
+        <div class="card-head">
+          <h4>人民币汇率（离岸）</h4>
+          <span class="vol-amount" :class="fx.dayChangePct >= 0 ? 'down' : 'up'">{{ fx.latest.toFixed(4) }}</span>
+          <span class="vol-change" :class="fx.dayChangePct >= 0 ? 'down' : 'up'">
+            {{ fx.dayChangePct >= 0 ? '贬值' : '升值' }} {{ Math.abs(fx.dayChangePct).toFixed(2) }}%
+          </span>
+        </div>
+        <MultiLineChart
+          :times="fx.points.map((p) => p.date.slice(5))"
+          :series="[{ name: 'USDCNH', data: fx.points.map((p) => p.rate), color: '#b88230' }]"
+          unit="" />
+        <div class="hsgt-note">美元兑人民币，上升=贬值（{{ fx.latestDate }}）</div>
+      </div>
+
+      <div class="page-card" v-if="us10y && us10y.points.length">
+        <div class="card-head">
+          <h4>十年期美债</h4>
+          <span class="vol-amount" :class="us10y.dayChangeBp >= 0 ? 'up' : 'down'">{{ us10y.latest.toFixed(2) }}%</span>
+          <span class="vol-change" :class="us10y.dayChangeBp >= 0 ? 'up' : 'down'">
+            {{ us10y.dayChangeBp >= 0 ? '+' : '' }}{{ (us10y.dayChangeBp / 100).toFixed(2) }}bp
+          </span>
+        </div>
+        <MultiLineChart
+          :times="us10y.points.map((p) => p.date.slice(5))"
+          :series="[{ name: 'US10Y', data: us10y.points.map((p) => p.rate), color: '#5470c6' }]"
+          unit="%" />
+        <div class="hsgt-note">
+          全球资产定价之锚（{{ us10y.latestDate }}）· 近一月 {{ (us10y.monthChangeBp ?? 0) >= 0 ? '+' : '' }}{{ ((us10y.monthChangeBp ?? 0) / 100).toFixed(2) }}bp
+        </div>
+      </div>
+
+      <div class="page-card" v-if="cnBond && cnBond.points.length">
+        <div class="card-head">
+          <h4>中国国债（10年期）</h4>
+          <span class="vol-amount" :class="cnBond.dayChangeBp >= 0 ? 'up' : 'down'">{{ cnBond.latest10y.toFixed(2) }}%</span>
+          <span class="vol-change" :class="cnBond.dayChangeBp >= 0 ? 'up' : 'down'">
+            {{ cnBond.dayChangeBp >= 0 ? '+' : '' }}{{ (cnBond.dayChangeBp / 100).toFixed(2) }}bp
+          </span>
+        </div>
+        <MultiLineChart
+          :times="cnBond.points.map((p) => p.date.slice(5))"
+          :series="[
+            { name: '30年期', data: cnBond.points.map((p) => p.y30), color: '#8d4863' },
+            { name: '10年期', data: cnBond.points.map((p) => p.y10), color: '#c23531' },
+            { name: '5年期', data: cnBond.points.map((p) => p.y5), color: '#e8a0a8' },
+          ]"
+          unit="%" />
+        <div class="hsgt-note">
+          5/10/30年期国债收益率（{{ cnBond.latestDate }}）· 中美利差 {{ ((cnBond.latest10y - (us10y?.latest ?? 0)) * 100).toFixed(0) }}bp
+        </div>
+      </div>
     </div>
 
     <div class="two-col">
@@ -218,7 +284,9 @@ onMounted(load)
 .idx-head .value { font-size: 18px; }
 .u { font-size: 12px; color: #909399; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-@media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } }
+.rate-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+@media (max-width: 1000px) { .two-col, .rate-row { grid-template-columns: 1fr; } }
+@media (min-width: 1001px) and (max-width: 1300px) { .rate-row { grid-template-columns: 1fr 1fr; } }
 .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .card-head h4 { font-size: 15px; }
 .vol-amount { font-size: 20px; margin-left: 6px; }

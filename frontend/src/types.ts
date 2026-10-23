@@ -142,6 +142,43 @@ export interface FxRate {
   points: FxPoint[]
 }
 
+export interface Us10y {
+  latest: number
+  latestDate: string
+  dayChangeBp: number
+  monthChangeBp: number | null
+  points: FxPoint[]
+}
+
+export interface CnBondPoint {
+  date: string
+  y5: number
+  y10: number
+  y30: number
+}
+
+export interface CnBond {
+  latest10y: number
+  latestDate: string
+  dayChangeBp: number
+  monthChangeBp: number | null
+  points: CnBondPoint[]
+}
+
+export interface IndexItem {
+  code: string
+  name: string
+  group: string
+  price: number
+  changePct: number
+  amount: number
+  trend: number[]
+}
+
+export interface IndicesData {
+  items: IndexItem[]
+}
+
 export interface LiquidityOverview {
   latestShiborDate: string
   shiborOn: number

@@ -71,6 +71,29 @@ public record FxRateDto(
     double? MonthChangePct,
     List<FxPointDto> Points);
 
+/// <summary>十年期美债收益率（%）。DayChangeBp：较上日变动（基点）。</summary>
+public record Us10yDto(
+    double Latest,
+    string LatestDate,
+    double DayChangeBp,
+    double? MonthChangeBp,
+    List<FxPointDto> Points);
+
+/// <summary>人民币中长期国债收益率（%）：5 年 / 10 年 / 30 年期。</summary>
+public record CnBondPointDto(string Date, double Y5, double Y10, double Y30);
+
+public record CnBondDto(
+    double Latest10y,
+    string LatestDate,
+    double DayChangeBp,
+    double? MonthChangeBp,
+    List<CnBondPointDto> Points);
+
+/// <summary>指数页面清单项。Amount 为当日成交额（亿元）。</summary>
+public record IndexItemDto(string Code, string Name, string Group, double Price, double ChangePct, double Amount, List<double> Trend);
+
+public record IndicesResponse(List<IndexItemDto> Items);
+
 /// <summary>沪深港通（北上/南下）资金。单位：亿元。</summary>
 public record HsgtPointDto(string Date, double NorthAmount, double SouthNetInflow, double SouthAmount);
 

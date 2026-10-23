@@ -14,7 +14,7 @@ public class TushareProvider : IQuoteProvider
     public Task<List<StockBasic>> FetchStockListAsync(CancellationToken ct = default)
         => throw new NotImplementedException("Tushare 适配器尚未接入，请使用东方财富数据源。");
 
-    public Task<List<KLineItem>> FetchKLineAsync(string symbol, int secMarket, int klt, int limit, CancellationToken ct = default)
+    public Task<List<KLineItem>> FetchKLineAsync(string symbol, int secMarket, int klt, int limit, int fqt = 1, CancellationToken ct = default)
         => throw new NotImplementedException("Tushare 适配器尚未接入，请使用东方财富数据源。");
 
     public Task<List<MoneyFlowItem>> FetchMoneyFlowAsync(string symbol, int secMarket, int days, CancellationToken ct = default)

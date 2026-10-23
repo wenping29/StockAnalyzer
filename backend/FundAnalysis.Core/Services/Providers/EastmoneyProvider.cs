@@ -117,9 +117,9 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
         }
     }
 
-    public async Task<List<KLineItem>> FetchKLineAsync(string symbol, int secMarket, int klt, int limit, CancellationToken ct = default)
+    public async Task<List<KLineItem>> FetchKLineAsync(string symbol, int secMarket, int klt, int limit, int fqt = 1, CancellationToken ct = default)
     {
-        var url = $"https://push2his.eastmoney.com/api/qt/stock/kline/get?secid={secMarket}.{symbol}&klt={klt}&fqt=1&lmt={limit}&end=20500101&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61";
+        var url = $"https://push2his.eastmoney.com/api/qt/stock/kline/get?secid={secMarket}.{symbol}&klt={klt}&fqt={fqt}&lmt={limit}&end=20500101&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61";
         using var client = NewClient();
         using var doc = JsonDocument.Parse(await client.GetStringAsync(url, ct));
         var list = new List<KLineItem>();
