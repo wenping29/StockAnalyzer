@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FundAnalysis.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261023134151_Init")]
+    [Migration("20261023160720_Init")]
     partial class Init
     {
         /// <inheritdoc />

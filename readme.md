@@ -76,10 +76,43 @@ npm run dev
 | GET/POST/DELETE | /api/watchlist | 自选管理 | 登录 |
 | GET | /api/admin/users 等 | 用户/角色/采集触发 | Admin |
 
+## 多数据库支持
+
+后端通过配置切换数据库，支持 **SQLite（默认）/ MySQL / PostgreSQL / Oracle / SQL Server**，对应 EF Core 官方提供程序包（`MySql.EntityFrameworkCore`、`Npgsql.EntityFrameworkCore.PostgreSQL`、`Oracle.EntityFrameworkCore`、`Microsoft.EntityFrameworkCore.SqlServer`）。
+
+**切换步骤**（迁移文件与数据库绑定，切换后必须重新生成）：
+
+```bash
+cd backend/FundAnalysis
+rm -rf Migrations                                  # 1. 删除旧迁移
+dotnet ef migrations add Init                      # 2. 按当前配置的数据库重新生成
+dotnet run                                         # 3. 启动时自动建表 + 初始化
+```
+
+`appsettings.json` 配置示例（改 `Database:Provider` 和连接串即可）：
+
+```jsonc
+{
+  "Database": { "Provider": "mysql" },
+  "ConnectionStrings": {
+    // mysql:      "Server=localhost;Port=3306;Database=fund_analysis;User=root;Password=xxx;"
+    // postgresql: "Host=localhost;Port=5432;Database=fund_analysis;Username=postgres;Password=xxx"
+    // oracle:     "User Id=fund;Password=xxx;Data Source=//localhost:1521/XEPDB1"  （要求 Oracle 19c+）
+    // sqlserver:  "Server=localhost;Database=FundAnalysis;User Id=sa;Password=xxx;TrustServerCertificate=True"
+    // sqlite:     "Data Source=fundanalysis.db"
+    "Default": "Server=localhost;Port=3306;Database=fund_analysis;User=root;Password=xxx;"
+  }
+}
+```
+
+也可以不改正配置文件，用命令行临时指定：`dotnet run -- --Database:Provider postgresql`。
+
+已针对四种服务器数据库验证过模型到 DDL 的翻译（`dotnet ef dbcontext script`），包括各库的自增主键差异、PostgreSQL 的本地时间列（`timestamp without time zone`）适配、Oracle 的类型映射（`NUMBER`/`NVARCHAR2`，要求 19c+）。
+
 ## 说明与已知限制
 
 - **数据源**：东方财富非官方公开接口，字段解析基于当前返回格式；全市场列表接口在部分网络环境不可用，系统已改为"搜索即注册"模式，不影响使用。接入 Tushare 时实现 `TushareProvider` 即可。
-- **SQLite**：单机开发够用；上线多用户时把 `appsettings.json` 连接串换成 MySQL/PostgreSQL 并更换 EF Core 提供程序包（`UseSqlite` → `UseNpgsql` 等），迁移重新生成即可。
+- **数据库**：开发默认 SQLite（零配置）；上线多用户建议 MySQL/PostgreSQL，见上文"多数据库支持"。
 - **场外基金**：一天一个净值，没有小时线/资金流，前端已自动隐藏对应入口。
 - **分钟线**：仅采集自选标的（控制体积），小时线由 5 分钟线聚合。
 - Hangfire 用内存存储（定时任务每次启动重新注册）；需要任务历史持久化时换 MySQL 存储包。
