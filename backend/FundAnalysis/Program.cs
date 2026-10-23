@@ -6,7 +6,6 @@ using FundAnalysis.Models;
 using FundAnalysis.Services;
 using FundAnalysis.Services.Providers;
 using Hangfire;
-using Hangfire.SQLite;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +37,7 @@ builder.Services.AddIdentityCore<AppUser>(opt =>
     opt.Lockout.MaxFailedAccessAttempts = 10;
     opt.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
 })
+.AddRoles<IdentityRole>()
 .AddEntityFrameworkStores<AppDbContext>()
 .AddSignInManager<SignInManager<AppUser>>()
 .AddDefaultTokenProviders();
@@ -60,12 +60,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 
-// ---------- Hangfire（SQLite 存储，Dashboard 在 /hangfire） ----------
+// ---------- Hangfire（内存存储，Dashboard 在 /hangfire） ----------
+// 说明：定时任务在每次启动时重新注册，内存存储足够；以后上 MySQL 可换持久化存储
 builder.Services.AddHangfire(h => h
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
-    .UseSQLiteStorage(config.GetConnectionString("Hangfire")));
+    .UseInMemoryStorage());
 builder.Services.AddHangfireServer();
 
 // ---------- 业务服务 ----------
@@ -120,8 +121,8 @@ if (!EF.IsDesignTime)
         var jobs = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
         CollectorJobs.Register(jobs);
 
-        // 首次启动（空库）时，后台队列自动拉取初始数据
-        if (!db.StockBasics.Any())
+        // 首次启动（还没有任何行情数据）时，后台队列自动拉取示例标的数据
+        if (!db.StockDailies.Any() && !db.FundNavs.Any())
         {
             var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
             bg.Enqueue<CollectorService>(s => s.InitialSyncAsync());

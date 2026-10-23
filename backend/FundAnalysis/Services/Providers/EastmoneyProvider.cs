@@ -20,7 +20,50 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
     {
         var client = factory.CreateClient("eastmoney");
         client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+        // 东财 push2 对 keep-alive 连接复用支持差，用短连接避免中途断连
+        client.DefaultRequestHeaders.Connection.Add("close");
         return client;
+    }
+
+    public async Task<List<StockBasic>> FetchSuggestAsync(string keyword, CancellationToken ct = default)
+    {
+        var url = $"https://searchapi.eastmoney.com/api/suggest/get?input={Uri.EscapeDataString(keyword)}&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=10";
+        using var client = NewClient();
+        client.DefaultRequestHeaders.Referrer = new Uri("https://www.eastmoney.com/");
+        using var doc = JsonDocument.Parse(await client.GetStringAsync(url, ct));
+
+        var list = new List<StockBasic>();
+        if (!doc.RootElement.TryGetProperty("QuotationCodeTable", out var table) ||
+            !table.TryGetProperty("Data", out var data) || data.ValueKind != JsonValueKind.Array)
+            return list;
+
+        foreach (var row in data.EnumerateArray())
+        {
+            var classify = GetString(row, "Classify");
+            // Index/Bond 等暂不支持；Classify=Fund 是场内基金（ETF/LOF），OTCFUND 是场外基金
+            var type = classify switch
+            {
+                "AStock" => SymbolTypes.Stock,
+                "Fund" => SymbolTypes.Etf,
+                "OTCFUND" => SymbolTypes.Fund,
+                _ => null,
+            };
+            if (type is null) continue;
+
+            var symbol = GetString(row, "Code");
+            if (string.IsNullOrWhiteSpace(symbol)) continue;
+
+            _ = int.TryParse(GetString(row, "MktNum"), out var secMarket);
+            list.Add(new StockBasic
+            {
+                Symbol = symbol,
+                Name = GetString(row, "Name") ?? symbol,
+                SecMarket = secMarket,
+                Type = type,
+                UpdatedAt = DateTime.Now,
+            });
+        }
+        return list;
     }
 
     public async Task<List<StockBasic>> FetchStockListAsync(CancellationToken ct = default)
@@ -40,26 +83,37 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
 
     private async Task FetchCListAsync(string fs, string type, List<StockBasic> result, CancellationToken ct)
     {
-        var url = $"https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=7000&po=1&np=1&fltt=2&invt=2&fid=f12&fs={Uri.EscapeDataString(fs)}&fields=f12,f13,f14";
         using var client = NewClient();
-        using var doc = JsonDocument.Parse(await client.GetStringAsync(url, ct));
-        if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind == JsonValueKind.Null)
-            return;
-        if (!data.TryGetProperty("diff", out var diff) || diff.ValueKind != JsonValueKind.Array)
-            return;
+        const int pageSize = 100; // 东财 clist 接口单页上限约 100 条，需翻页
 
-        foreach (var row in diff.EnumerateArray())
+        for (var page = 1; page <= 200; page++)
         {
-            var symbol = GetString(row, "f12");
-            if (string.IsNullOrWhiteSpace(symbol)) continue;
-            result.Add(new StockBasic
+            var url = $"https://push2.eastmoney.com/api/qt/clist/get?pn={page}&pz={pageSize}&po=1&np=1&fltt=2&invt=2&fid=f12&fs={Uri.EscapeDataString(fs)}&fields=f12,f13,f14";
+            var body = await GetWithRetryAsync(client, url, ct);
+            using var doc = JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind == JsonValueKind.Null)
+                break;
+            if (!data.TryGetProperty("diff", out var diff) || diff.ValueKind != JsonValueKind.Array)
+                break;
+
+            var count = 0;
+            foreach (var row in diff.EnumerateArray())
             {
-                Symbol = symbol,
-                Name = GetString(row, "f14") ?? symbol,
-                SecMarket = GetInt(row, "f13"),
-                Type = type,
-                UpdatedAt = DateTime.Now,
-            });
+                var symbol = GetString(row, "f12");
+                if (string.IsNullOrWhiteSpace(symbol)) continue;
+                result.Add(new StockBasic
+                {
+                    Symbol = symbol,
+                    Name = GetString(row, "f14") ?? symbol,
+                    SecMarket = GetInt(row, "f13"),
+                    Type = type,
+                    UpdatedAt = DateTime.Now,
+                });
+                count++;
+            }
+
+            // 拉到的条数少于页大小，说明已到最后一页
+            if (count < pageSize) break;
         }
     }
 
@@ -148,6 +202,24 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
                 ChangePct: Num(GetString(row, "JZZZL"))));
         }
         return list;
+    }
+
+    /// <summary>带重试的 GET：连续快速请求容易触发东财服务端断连，重试 5 次、每页间隔 400ms。</summary>
+    private static async Task<string> GetWithRetryAsync(HttpClient client, string url, CancellationToken ct)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                var body = await client.GetStringAsync(url, ct);
+                await Task.Delay(400, ct);
+                return body;
+            }
+            catch (Exception) when (attempt < 5)
+            {
+                await Task.Delay(1000 * attempt, ct);
+            }
+        }
     }
 
     private static string? GetString(JsonElement obj, string name)

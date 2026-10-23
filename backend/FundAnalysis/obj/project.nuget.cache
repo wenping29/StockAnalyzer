@@ -1,14 +1,13 @@
 {
   "version": 2,
-  "dgSpecHash": "rwE0RcMOBtw=",
+  "dgSpecHash": "fU+aRQui7Z8=",
   "success": true,
   "projectFilePath": "F:\\Project\\Zcode\\backend\\FundAnalysis\\FundAnalysis.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\fuwenping\\.nuget\\packages\\dapper\\1.50.2\\dapper.1.50.2.nupkg.sha512",
     "C:\\Users\\fuwenping\\.nuget\\packages\\hangfire.aspnetcore\\1.8.25\\hangfire.aspnetcore.1.8.25.nupkg.sha512",
     "C:\\Users\\fuwenping\\.nuget\\packages\\hangfire.core\\1.8.25\\hangfire.core.1.8.25.nupkg.sha512",
+    "C:\\Users\\fuwenping\\.nuget\\packages\\hangfire.inmemory\\1.0.0\\hangfire.inmemory.1.0.0.nupkg.sha512",
     "C:\\Users\\fuwenping\\.nuget\\packages\\hangfire.netcore\\1.8.25\\hangfire.netcore.1.8.25.nupkg.sha512",
-    "C:\\Users\\fuwenping\\.nuget\\packages\\hangfire.sqlite\\1.4.2\\hangfire.sqlite.1.4.2.nupkg.sha512",
     "C:\\Users\\fuwenping\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\fuwenping\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\10.0.13\\microsoft.aspnetcore.authentication.jwtbearer.10.0.13.nupkg.sha512",
     "C:\\Users\\fuwenping\\.nuget\\packages\\microsoft.aspnetcore.identity.entityframeworkcore\\10.0.13\\microsoft.aspnetcore.identity.entityframeworkcore.10.0.13.nupkg.sha512",
@@ -59,10 +58,8 @@
     "C:\\Users\\fuwenping\\.nuget\\packages\\system.composition.hosting\\9.0.0\\system.composition.hosting.9.0.0.nupkg.sha512",
     "C:\\Users\\fuwenping\\.nuget\\packages\\system.composition.runtime\\9.0.0\\system.composition.runtime.9.0.0.nupkg.sha512",
     "C:\\Users\\fuwenping\\.nuget\\packages\\system.composition.typedparts\\9.0.0\\system.composition.typedparts.9.0.0.nupkg.sha512",
-    "C:\\Users\\fuwenping\\.nuget\\packages\\system.configuration.configurationmanager\\4.4.0\\system.configuration.configurationmanager.4.4.0.nupkg.sha512",
     "C:\\Users\\fuwenping\\.nuget\\packages\\system.data.sqlclient\\4.9.0\\system.data.sqlclient.4.9.0.nupkg.sha512",
-    "C:\\Users\\fuwenping\\.nuget\\packages\\system.identitymodel.tokens.jwt\\8.19.2\\system.identitymodel.tokens.jwt.8.19.2.nupkg.sha512",
-    "C:\\Users\\fuwenping\\.nuget\\packages\\system.security.cryptography.protecteddata\\4.4.0\\system.security.cryptography.protecteddata.4.4.0.nupkg.sha512"
+    "C:\\Users\\fuwenping\\.nuget\\packages\\system.identitymodel.tokens.jwt\\8.19.2\\system.identitymodel.tokens.jwt.8.19.2.nupkg.sha512"
   ],
   "logs": []
 }

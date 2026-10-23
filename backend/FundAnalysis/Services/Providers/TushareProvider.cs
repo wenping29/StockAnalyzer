@@ -8,6 +8,9 @@ namespace FundAnalysis.Services.Providers;
 /// </summary>
 public class TushareProvider : IQuoteProvider
 {
+    public Task<List<StockBasic>> FetchSuggestAsync(string keyword, CancellationToken ct = default)
+        => throw new NotImplementedException("Tushare 适配器尚未接入，请使用东方财富数据源。");
+
     public Task<List<StockBasic>> FetchStockListAsync(CancellationToken ct = default)
         => throw new NotImplementedException("Tushare 适配器尚未接入，请使用东方财富数据源。");
 

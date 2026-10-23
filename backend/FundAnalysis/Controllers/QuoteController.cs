@@ -1,5 +1,6 @@
 using FundAnalysis.Models;
 using FundAnalysis.Services;
+using FundAnalysis.Services.Providers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,25 +10,39 @@ namespace FundAnalysis.Controllers;
 
 [ApiController]
 [Route("api/quote")]
-public class QuoteController(AppDbContext db, AnalysisService analysis) : ControllerBase
+public class QuoteController(AppDbContext db, AnalysisService analysis, IQuoteProvider provider) : ControllerBase
 {
-    /// <summary>标的搜索（代码或名称模糊匹配）。</summary>
+    /// <summary>标的搜索：转发东财搜索接口（代码/拼音/名称），结果自动入库供后续采集使用。</summary>
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] string keyword, [FromQuery] int limit = 20)
     {
         if (string.IsNullOrWhiteSpace(keyword))
             return Ok(Array.Empty<SearchItemDto>());
 
-        var k = keyword.Trim();
-        var items = await db.StockBasics
-            .Where(x => x.Symbol.Contains(k) || x.Name.Contains(k))
-            .OrderBy(x => x.Symbol)
-            .Take(Math.Clamp(limit, 1, 50))
-            .Select(x => new SearchItemDto(
-                x.Symbol, x.Name, x.Type,
-                x.SecMarket == 1 ? "沪" : x.Type == SymbolTypes.Fund ? "基金" : "深/北"))
-            .ToListAsync();
-        return Ok(items);
+        var items = await provider.FetchSuggestAsync(keyword.Trim());
+
+        // 搜索结果入库（搜索即注册），这样添加自选时标的已存在
+        var symbols = items.Select(x => x.Symbol).ToList();
+        var existing = await db.StockBasics.Where(x => symbols.Contains(x.Symbol)).ToDictionaryAsync(x => x.Symbol);
+        foreach (var item in items)
+        {
+            if (existing.TryGetValue(item.Symbol, out var local))
+            {
+                local.Name = item.Name;
+                local.SecMarket = item.SecMarket;
+                local.Type = item.Type;
+                local.UpdatedAt = DateTime.Now;
+            }
+            else
+            {
+                db.StockBasics.Add(item);
+            }
+        }
+        await db.SaveChangesAsync();
+
+        return Ok(items.Take(Math.Clamp(limit, 1, 20)).Select(x => new SearchItemDto(
+            x.Symbol, x.Name, x.Type,
+            x.Type == SymbolTypes.Fund ? "场外基金" : x.SecMarket == 1 ? "沪" : "深")));
     }
 
     /// <summary>标的基础信息。</summary>

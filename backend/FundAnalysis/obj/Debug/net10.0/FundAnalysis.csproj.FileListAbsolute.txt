@@ -13,11 +13,9 @@ F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\FundAnalysis.deps.json
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\FundAnalysis.runtimeconfig.json
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\FundAnalysis.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\FundAnalysis.pdb
-F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\Dapper.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\Hangfire.AspNetCore.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\Hangfire.Core.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\Hangfire.NetCore.dll
-F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\Hangfire.SQLite.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\Humanizer.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll
@@ -58,10 +56,8 @@ F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\System.Composition.Conve
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\System.Composition.Hosting.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\System.Composition.Runtime.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\System.Composition.TypedParts.dll
-F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\System.Configuration.ConfigurationManager.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\System.Data.SqlClient.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\System.IdentityModel.Tokens.Jwt.dll
-F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\System.Security.Cryptography.ProtectedData.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\ca\Hangfire.Core.resources.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\de\Hangfire.Core.resources.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\es\Hangfire.Core.resources.dll
@@ -169,7 +165,6 @@ F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\runtimes\win-x64\native\
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\runtimes\win-x86\native\e_sqlite3.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\runtimes\unix\lib\net8.0\System.Data.SqlClient.dll
 F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\runtimes\win\lib\net8.0\System.Data.SqlClient.dll
-F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\runtimes\win\lib\netstandard2.0\System.Security.Cryptography.ProtectedData.dll
 F:\Project\Zcode\backend\FundAnalysis\obj\Debug\net10.0\rjimswa.dswa.cache.json
 F:\Project\Zcode\backend\FundAnalysis\obj\Debug\net10.0\rjsmrazor.dswa.cache.json
 F:\Project\Zcode\backend\FundAnalysis\obj\Debug\net10.0\rjsmcshtml.dswa.cache.json
@@ -185,3 +180,4 @@ F:\Project\Zcode\backend\FundAnalysis\obj\Debug\net10.0\refint\FundAnalysis.dll
 F:\Project\Zcode\backend\FundAnalysis\obj\Debug\net10.0\FundAnalysis.pdb
 F:\Project\Zcode\backend\FundAnalysis\obj\Debug\net10.0\FundAnalysis.genruntimeconfig.cache
 F:\Project\Zcode\backend\FundAnalysis\obj\Debug\net10.0\ref\FundAnalysis.dll
+F:\Project\Zcode\backend\FundAnalysis\bin\Debug\net10.0\Hangfire.InMemory.dll

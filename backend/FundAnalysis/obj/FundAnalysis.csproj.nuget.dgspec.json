@@ -57,9 +57,9 @@
               "target": "Package",
               "version": "[1.8.25, )"
             },
-            "Hangfire.SQLite": {
+            "Hangfire.InMemory": {
               "target": "Package",
-              "version": "[1.4.2, )"
+              "version": "[1.0.0, )"
             },
             "Microsoft.AspNetCore.Authentication.JwtBearer": {
               "target": "Package",

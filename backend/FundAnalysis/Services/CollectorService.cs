@@ -12,12 +12,35 @@ public class CollectorService(AppDbContext db, IQuoteProvider provider, IConfigu
     private const int MoneyFlowDays = 120;  // 约半年资金流
     private const int MinuteBars = 100;     // 约 2 个交易日的 5 分钟线
 
-    /// <summary>首次启动的初始化任务：全市场标的列表 + 示例标的的日线与分钟线。</summary>
+    /// <summary>首次启动的初始化任务：注册示例标的并拉取其全部数据。</summary>
     public async Task InitialSyncAsync()
     {
-        await SyncStockListAsync();
-        foreach (var symbol in GetAllSymbols())
+        foreach (var symbol in GetSampleSymbols())
+        {
+            var basic = await EnsureBasicAsync(symbol);
+            if (basic is null)
+            {
+                logger.LogWarning("示例标的 {Symbol} 未能通过搜索接口注册，跳过", symbol);
+                continue;
+            }
             await SyncSymbolAsync(symbol);
+        }
+    }
+
+    /// <summary>确保标的已注册到 StockBasic。本地没有时通过搜索接口按代码精确查找并入库。</summary>
+    public async Task<StockBasic?> EnsureBasicAsync(string symbol)
+    {
+        var local = await db.StockBasics.FirstOrDefaultAsync(x => x.Symbol == symbol);
+        if (local is not null) return local;
+
+        var suggestions = await provider.FetchSuggestAsync(symbol);
+        var match = suggestions.FirstOrDefault(x => x.Symbol == symbol);
+        if (match is null) return null;
+
+        db.StockBasics.Add(match);
+        await db.SaveChangesAsync();
+        logger.LogInformation("标的 {Symbol} {Name} 已注册", match.Symbol, match.Name);
+        return match;
     }
 
     /// <summary>同步全市场股票/ETF 基础列表。</summary>
@@ -228,9 +251,11 @@ public class CollectorService(AppDbContext db, IQuoteProvider provider, IConfigu
     private string[] GetAllSymbols()
     {
         var watchlist = db.WatchlistItems.Select(x => x.Symbol).Distinct().ToList();
-        var samples = config.GetSection("Collector:SampleSymbols").Get<string[]>() ?? [];
-        return watchlist.Union(samples).Distinct().ToArray();
+        return watchlist.Union(GetSampleSymbols()).Distinct().ToArray();
     }
+
+    private string[] GetSampleSymbols()
+        => config.GetSection("Collector:SampleSymbols").Get<string[]>() ?? [];
 
     private async Task<Dictionary<string, StockBasic>> GetBasicsAsync(IEnumerable<string> symbols)
         => await db.StockBasics.Where(x => symbols.Contains(x.Symbol)).ToDictionaryAsync(x => x.Symbol);

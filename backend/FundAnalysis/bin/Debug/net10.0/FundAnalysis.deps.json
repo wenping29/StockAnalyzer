@@ -9,7 +9,7 @@
       "FundAnalysis/1.0.0": {
         "dependencies": {
           "Hangfire.AspNetCore": "1.8.25",
-          "Hangfire.SQLite": "1.4.2",
+          "Hangfire.InMemory": "1.0.0",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "10.0.13",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "10.0.13",
           "Microsoft.EntityFrameworkCore.Design": "10.0.13",
@@ -19,17 +19,6 @@
         },
         "runtime": {
           "FundAnalysis.dll": {}
-        }
-      },
-      "Dapper/1.50.2": {
-        "dependencies": {
-          "System.Data.SqlClient": "4.9.0"
-        },
-        "runtime": {
-          "lib/netstandard1.3/Dapper.dll": {
-            "assemblyVersion": "1.50.2.0",
-            "fileVersion": "1.50.2.0"
-          }
         }
       },
       "Hangfire.AspNetCore/1.8.25": {
@@ -101,6 +90,17 @@
           }
         }
       },
+      "Hangfire.InMemory/1.0.0": {
+        "dependencies": {
+          "Hangfire.Core": "1.8.25"
+        },
+        "runtime": {
+          "lib/netstandard2.0/Hangfire.InMemory.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
       "Hangfire.NetCore/1.8.25": {
         "dependencies": {
           "Hangfire.Core": "1.8.25"
@@ -109,21 +109,6 @@
           "lib/netstandard2.1/Hangfire.NetCore.dll": {
             "assemblyVersion": "1.8.25.0",
             "fileVersion": "1.8.25.0"
-          }
-        }
-      },
-      "Hangfire.SQLite/1.4.2": {
-        "dependencies": {
-          "Dapper": "1.50.2",
-          "Hangfire.Core": "1.8.25",
-          "Microsoft.Data.Sqlite.Core": "10.0.13",
-          "Newtonsoft.Json": "13.0.4",
-          "System.Configuration.ConfigurationManager": "4.4.0"
-        },
-        "runtime": {
-          "lib/netstandard2.0/Hangfire.SQLite.dll": {
-            "assemblyVersion": "1.4.2.0",
-            "fileVersion": "1.4.2.0"
           }
         }
       },
@@ -919,17 +904,6 @@
           }
         }
       },
-      "System.Configuration.ConfigurationManager/4.4.0": {
-        "dependencies": {
-          "System.Security.Cryptography.ProtectedData": "4.4.0"
-        },
-        "runtime": {
-          "lib/netstandard2.0/System.Configuration.ConfigurationManager.dll": {
-            "assemblyVersion": "4.0.0.0",
-            "fileVersion": "4.6.25519.3"
-          }
-        }
-      },
       "System.Data.SqlClient/4.9.0": {
         "dependencies": {
           "runtime.native.System.Data.SqlClient.sni": "4.4.0"
@@ -966,22 +940,6 @@
             "fileVersion": "8.19.2.26195"
           }
         }
-      },
-      "System.Security.Cryptography.ProtectedData/4.4.0": {
-        "runtime": {
-          "lib/netstandard2.0/System.Security.Cryptography.ProtectedData.dll": {
-            "assemblyVersion": "4.0.2.0",
-            "fileVersion": "4.6.25519.3"
-          }
-        },
-        "runtimeTargets": {
-          "runtimes/win/lib/netstandard2.0/System.Security.Cryptography.ProtectedData.dll": {
-            "rid": "win",
-            "assetType": "runtime",
-            "assemblyVersion": "4.0.2.0",
-            "fileVersion": "4.6.25519.3"
-          }
-        }
       }
     }
   },
@@ -990,13 +948,6 @@
       "type": "project",
       "serviceable": false,
       "sha512": ""
-    },
-    "Dapper/1.50.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-6VcCiiOxVhgMwgMCuQuaff8I5IyDamrzeOjuUH1iMExh8R5TJqwkVCpwdVJGQdwSCqWsQA/PerrrK7T6mONthQ==",
-      "path": "dapper/1.50.2",
-      "hashPath": "dapper.1.50.2.nupkg.sha512"
     },
     "Hangfire.AspNetCore/1.8.25": {
       "type": "package",
@@ -1012,19 +963,19 @@
       "path": "hangfire.core/1.8.25",
       "hashPath": "hangfire.core.1.8.25.nupkg.sha512"
     },
+    "Hangfire.InMemory/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-56H71lfcqn5sN/8Bjj9hOLGTG5HIERLRuMsRJTFpw0Tsq5ck5OUkNvtUw92s7bwD3PRKOo4PkDGqNs9KugaqoQ==",
+      "path": "hangfire.inmemory/1.0.0",
+      "hashPath": "hangfire.inmemory.1.0.0.nupkg.sha512"
+    },
     "Hangfire.NetCore/1.8.25": {
       "type": "package",
       "serviceable": true,
       "sha512": "sha512-ZfI7gwr7n70r635VS9aKsWSzOodY6U0bSIG0jDrqd5ODRLKvc+e5aXXGCnWHWzjvagvlwtUcRGG/lD0/3C7chA==",
       "path": "hangfire.netcore/1.8.25",
       "hashPath": "hangfire.netcore.1.8.25.nupkg.sha512"
-    },
-    "Hangfire.SQLite/1.4.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-8ZONqFjC7la5dTB1I57WSBOlcx9ZVxXY/8C8+MLQwCiBHNQXfb3HjtyODP1NIQDjuNBOhyxOl4Z6KlXNLmpxMg==",
-      "path": "hangfire.sqlite/1.4.2",
-      "hashPath": "hangfire.sqlite.1.4.2.nupkg.sha512"
     },
     "Humanizer.Core/2.14.1": {
       "type": "package",
@@ -1355,13 +1306,6 @@
       "path": "system.composition.typedparts/9.0.0",
       "hashPath": "system.composition.typedparts.9.0.0.nupkg.sha512"
     },
-    "System.Configuration.ConfigurationManager/4.4.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-gWwQv/Ug1qWJmHCmN17nAbxJYmQBM/E94QxKLksvUiiKB1Ld3Sc/eK1lgmbSjDFxkQhVuayI/cGFZhpBSodLrg==",
-      "path": "system.configuration.configurationmanager/4.4.0",
-      "hashPath": "system.configuration.configurationmanager.4.4.0.nupkg.sha512"
-    },
     "System.Data.SqlClient/4.9.0": {
       "type": "package",
       "serviceable": true,
@@ -1375,13 +1319,6 @@
       "sha512": "sha512-gqhDC/icByKEutygpr+OFgAmjwTVowyzFjWB8K0q1ww8uFj5a1BQNL+QvijUl9uhq4p8OdDwcAIrjVC+eC9FVA==",
       "path": "system.identitymodel.tokens.jwt/8.19.2",
       "hashPath": "system.identitymodel.tokens.jwt.8.19.2.nupkg.sha512"
-    },
-    "System.Security.Cryptography.ProtectedData/4.4.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-cJV7ScGW7EhatRsjehfvvYVBvtiSMKgN8bOVI0bQhnF5bU7vnHVIsH49Kva7i7GWaWYvmEzkYVk1TC+gZYBEog==",
-      "path": "system.security.cryptography.protecteddata/4.4.0",
-      "hashPath": "system.security.cryptography.protecteddata.4.4.0.nupkg.sha512"
     }
   }
 }

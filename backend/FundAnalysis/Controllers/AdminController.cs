@@ -69,7 +69,15 @@ public class AdminController(
         return Ok(new { message = request.Enabled ? $"已启用 {user.UserName}" : $"已禁用 {user.UserName}" });
     }
 
-    /// <summary>手动触发：同步全市场标的列表。</summary>
+    /// <summary>手动触发：注册示例标的并拉取全部初始数据（搜索接口注册，无需全市场列表）。</summary>
+    [HttpPost("collect/initial")]
+    public IActionResult TriggerInitial()
+    {
+        backgroundJobs.Enqueue<CollectorService>(s => s.InitialSyncAsync());
+        return Ok(new { message = "已提交：初始化示例标的数据" });
+    }
+
+    /// <summary>手动触发：同步全市场标的列表（部分网络环境不可用，失败不影响其他功能）。</summary>
     [HttpPost("collect/stock-list")]
     public IActionResult TriggerStockList()
     {

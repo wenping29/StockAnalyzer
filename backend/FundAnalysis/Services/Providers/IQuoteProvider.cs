@@ -15,7 +15,10 @@ public record FundNavItem(DateTime Date, double Nav, double AccNav, double Chang
 /// </summary>
 public interface IQuoteProvider
 {
-    /// <summary>拉取全市场股票 + ETF 基础列表（代码/名称/市场）。</summary>
+    /// <summary>关键词搜索标的（代码/拼音/名称），结果即时入库由调用方负责。</summary>
+    Task<List<StockBasic>> FetchSuggestAsync(string keyword, CancellationToken ct = default);
+
+    /// <summary>拉取全市场股票 + ETF 基础列表（部分网络环境下东财列表接口不可用，失败不影响主流程）。</summary>
     Task<List<StockBasic>> FetchStockListAsync(CancellationToken ct = default);
 
     /// <summary>拉取 K 线。klt：101=日线，5=5分钟线，15/30/60 分钟线。</summary>
