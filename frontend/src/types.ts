@@ -90,6 +90,29 @@ export interface AdminUser {
 
 // ---------- 央行流动性 ----------
 
+export interface MarketIndex {
+  code: string
+  name: string
+  market: string
+  price: number
+  changePct: number
+  trend: number[]
+}
+
+export interface MarketVolumePoint {
+  date: string
+  sh: number
+  sz: number
+  total: number
+}
+
+export interface MarketVolume {
+  todayAmount: number
+  yesterdayAmount: number
+  changePct: number | null
+  points: MarketVolumePoint[]
+}
+
 export interface LiquidityOverview {
   latestShiborDate: string
   shiborOn: number

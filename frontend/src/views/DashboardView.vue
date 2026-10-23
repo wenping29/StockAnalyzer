@@ -1,147 +1,213 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import type { SearchItem, WatchlistItem } from '../types'
-import {
-  fetchWatchlist, addToWatchlist, removeFromWatchlist, searchSymbol,
-} from '../api/quote'
+import type { MarketIndex, MarketVolume, WatchlistItem, LiquidityOverview } from '../types'
+import { fetchMarketOverview, fetchMarketVolume, fetchWatchlist } from '../api/quote'
+import { fetchLiquidityOverview } from '../api/liquidity'
+import SparkLine from '../components/SparkLine.vue'
+import VolumeBarChart from '../components/VolumeBarChart.vue'
 
 const router = useRouter()
-const items = ref<WatchlistItem[]>([])
-const loading = ref(false)
 
-// 远程搜索
-const options = ref<SearchItem[]>([])
-const searching = ref(false)
-let searchTimer: ReturnType<typeof setTimeout> | null = null
+const indices = ref<MarketIndex[]>([])
+const volume = ref<MarketVolume | null>(null)
+const watchlist = ref<WatchlistItem[]>([])
+const liquidity = ref<LiquidityOverview | null>(null)
+const loading = ref(true)
+
+// 自选统计
+const upCount = computed(() => watchlist.value.filter((w) => (w.changePct ?? 0) > 0).length)
+const downCount = computed(() => watchlist.value.filter((w) => (w.changePct ?? 0) < 0).length)
+const avgChange = computed(() => {
+  const items = watchlist.value.filter((w) => w.changePct != null)
+  if (!items.length) return null
+  return items.reduce((s, w) => s + (w.changePct ?? 0), 0) / items.length
+})
+const avgMonth = computed(() => {
+  const items = watchlist.value.filter((w) => w.monthReturnPct != null)
+  if (!items.length) return null
+  return items.reduce((s, w) => s + (w.monthReturnPct ?? 0), 0) / items.length
+})
+
+// 今日涨跌榜（各取前 5）
+const topGainers = computed(() =>
+  [...watchlist.value].sort((a, b) => (b.changePct ?? -99) - (a.changePct ?? -99)).slice(0, 5))
+const topLosers = computed(() =>
+  [...watchlist.value].sort((a, b) => (a.changePct ?? 99) - (b.changePct ?? 99)).slice(0, 5))
+
+function pctClass(v: number | null | undefined) {
+  return v == null ? '' : v >= 0 ? 'up' : 'down'
+}
+function fmtPct(v: number | null | undefined) {
+  return v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
+}
 
 async function load() {
   loading.value = true
   try {
-    items.value = await fetchWatchlist()
+    const [idx, vol, wl, liq] = await Promise.all([
+      fetchMarketOverview(),
+      fetchMarketVolume(30).catch(() => null),
+      fetchWatchlist().catch(() => [] as WatchlistItem[]),
+      fetchLiquidityOverview().catch(() => null),
+    ])
+    indices.value = idx
+    volume.value = vol
+    watchlist.value = wl
+    liquidity.value = liq
   } finally {
     loading.value = false
   }
 }
 
-function remoteSearch(keyword: string) {
-  if (searchTimer) clearTimeout(searchTimer)
-  if (!keyword.trim()) {
-    options.value = []
-    return
-  }
-  // 300ms 防抖
-  searchTimer = setTimeout(async () => {
-    searching.value = true
-    try {
-      options.value = await searchSymbol(keyword.trim())
-    } finally {
-      searching.value = false
-    }
-  }, 300)
-}
-
-async function add(item: SearchItem) {
-  const res = await addToWatchlist(item.symbol)
-  ElMessage.success(res.message)
-  load()
-}
-
-async function remove(row: WatchlistItem) {
-  await removeFromWatchlist(row.symbol)
-  ElMessage.success('已移除')
-  load()
-}
-
-function pctClass(v: number | null) {
-  return v == null ? '' : v >= 0 ? 'up' : 'down'
-}
-
-function fmtPct(v: number | null) {
-  return v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
-}
-
-function fmtYi(v: number | null) {
-  return v == null ? '—' : `${(v / 1e8).toFixed(2)} 亿`
-}
-
-const typeLabel: Record<string, string> = { Stock: '股票', Etf: 'ETF', Fund: '场外基金' }
-
 onMounted(load)
 </script>
 
 <template>
-  <div class="page-card">
-    <div class="toolbar">
-      <el-select
-        filterable
-        remote
-        clearable
-        placeholder="搜索代码 / 拼音 / 名称（如 600519、maotai、茅台）"
-        style="width: 420px"
-        :remote-method="remoteSearch"
-        :loading="searching"
-        @change="add"
-      >
-        <el-option
-          v-for="o in options"
-          :key="o.symbol + o.type"
-          :label="`${o.name} (${o.symbol})`"
-          :value="o"
-        >
-          <span>{{ o.name }}</span>
-          <span style="float: right; color: #909399; font-size: 12px">
-            {{ o.symbol }} · {{ typeLabel[o.type] ?? o.type }}
+  <div v-loading="loading">
+    <!-- 市场板块指数快照 -->
+    <div class="stat-cards index-row">
+      <div v-for="idx in indices" :key="idx.code" class="stat-card index-card">
+        <div class="idx-head">
+          <span class="label">
+            <el-tag size="small" effect="plain" round>{{ idx.market }}</el-tag>
+            {{ idx.name }}
           </span>
-        </el-option>
-      </el-select>
-      <span class="hint">选中即加入自选，后台自动采集数据</span>
-      <div style="flex: 1" />
-      <el-button :loading="loading" @click="load">刷新</el-button>
+          <span class="value" :class="pctClass(idx.changePct)">{{ idx.price.toFixed(2) }}</span>
+        </div>
+        <SparkLine :data="idx.trend" :up="(idx.changePct ?? 0) >= 0" />
+        <div class="sub" :class="pctClass(idx.changePct)">{{ fmtPct(idx.changePct) }}</div>
+      </div>
     </div>
 
-    <el-table :data="items" v-loading="loading" @row-click="(r: WatchlistItem) => router.push(`/analysis/${r.symbol}`)" row-class-name="row-click">
-      <el-table-column label="代码" width="100">
-        <template #default="{ row }">{{ row.symbol }}</template>
-      </el-table-column>
-      <el-table-column label="名称" min-width="140">
-        <template #default="{ row }">
-          {{ row.name }}
-          <el-tag size="small" type="info">{{ typeLabel[row.type] ?? row.type }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="最新价" width="100" align="right">
-        <template #default="{ row }">{{ row.latestPrice ?? '采集中…' }}</template>
-      </el-table-column>
-      <el-table-column label="涨跌幅" width="100" align="right">
-        <template #default="{ row }">
-          <span :class="pctClass(row.changePct)">{{ fmtPct(row.changePct) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="近1月收益" width="110" align="right">
-        <template #default="{ row }">
-          <span :class="pctClass(row.monthReturnPct)">{{ fmtPct(row.monthReturnPct) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="主力净流入(近5日)" width="160" align="right">
-        <template #default="{ row }">
-          <span :class="pctClass(row.mainNetIn5d)">{{ fmtYi(row.mainNetIn5d) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="90" align="center">
-        <template #default="{ row }">
-          <el-button link type="danger" @click.stop="remove(row)">移除</el-button>
-        </template>
-      </el-table-column>
-      <template #empty>
-        <el-empty description="自选为空，搜索添加标的，或等待首次自动采集（示例标的）" />
-      </template>
-    </el-table>
+    <!-- 两市成交量 -->
+    <div class="page-card" v-if="volume && volume.points.length">
+      <div class="card-head">
+        <h4>今日两市成交 <span class="vol-amount" :class="pctClass(volume.changePct)">{{ (volume.todayAmount / 10000).toFixed(2) }} 万亿</span></h4>
+        <span class="vol-change">
+          <template v-if="volume.changePct != null">
+            较昨日
+            <b :class="pctClass(volume.changePct)">
+              {{ (volume.changePct ?? 0) >= 0 ? '放量' : '缩量' }} {{ Math.abs(volume.changePct ?? 0).toFixed(1) }}%
+            </b>
+            （昨日 {{ (volume.yesterdayAmount / 10000).toFixed(2) }} 万亿）
+          </template>
+        </span>
+      </div>
+      <VolumeBarChart :points="volume.points" />
+    </div>
+
+    <div class="two-col">
+      <!-- 自选概览 -->
+      <div class="page-card">
+        <div class="card-head">
+          <h4>我的自选</h4>
+          <el-button link type="primary" @click="router.push('/watchlist')">进入自选分析 →</el-button>
+        </div>
+        <div class="mini-grid">
+          <div class="mini-item">
+            <div class="mini-value">{{ watchlist.length }}</div>
+            <div class="mini-label">自选标的</div>
+          </div>
+          <div class="mini-item">
+            <div class="mini-value up">{{ upCount }}</div>
+            <div class="mini-label">今日上涨</div>
+          </div>
+          <div class="mini-item">
+            <div class="mini-value down">{{ downCount }}</div>
+            <div class="mini-label">今日下跌</div>
+          </div>
+          <div class="mini-item">
+            <div class="mini-value" :class="pctClass(avgChange)">{{ fmtPct(avgChange) }}</div>
+            <div class="mini-label">今日平均涨跌</div>
+          </div>
+          <div class="mini-item">
+            <div class="mini-value" :class="pctClass(avgMonth)">{{ fmtPct(avgMonth) }}</div>
+            <div class="mini-label">近1月平均收益</div>
+          </div>
+        </div>
+        <el-empty v-if="!watchlist.length" description="自选为空，去自选页搜索添加" :image-size="60" />
+      </div>
+
+      <!-- 央行流动性速览 -->
+      <div class="page-card">
+        <div class="card-head">
+          <h4>央行流动性速览</h4>
+          <el-button link type="primary" @click="router.push('/liquidity')">流动性分析 →</el-button>
+        </div>
+        <div class="mini-grid" v-if="liquidity">
+          <div class="mini-item">
+            <div class="mini-value">{{ liquidity.shiborOn.toFixed(3) }}<span class="u">%</span></div>
+            <div class="mini-label">Shibor 隔夜 <span :class="pctClass(liquidity.shiborOnChangeBp)">{{ liquidity.shiborOnChangeBp >= 0 ? '+' : '' }}{{ liquidity.shiborOnChangeBp.toFixed(2) }}bp</span></div>
+          </div>
+          <div class="mini-item">
+            <div class="mini-value">{{ liquidity.shibor1W.toFixed(3) }}<span class="u">%</span></div>
+            <div class="mini-label">Shibor 1周</div>
+          </div>
+          <div class="mini-item">
+            <div class="mini-value" :class="pctClass(liquidity.m2YoY)">{{ liquidity.m2YoY.toFixed(1) }}%</div>
+            <div class="mini-label">M2 同比（{{ liquidity.latestSupplyMonth }}）</div>
+          </div>
+          <div class="mini-item">
+            <div class="mini-value">{{ liquidity.lpr1Y.toFixed(2) }}<span class="u">%</span></div>
+            <div class="mini-label">LPR 1年期</div>
+          </div>
+          <div class="mini-item">
+            <div class="mini-value">{{ liquidity.reserveLarge.toFixed(1) }}<span class="u">%</span></div>
+            <div class="mini-label">存准率（大型）</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 今日涨跌榜 -->
+    <div class="two-col" v-if="watchlist.length">
+      <div class="page-card">
+        <div class="card-head"><h4>今日涨幅榜</h4></div>
+        <div class="rank-list">
+          <div v-for="w in topGainers" :key="w.symbol" class="rank-item" @click="router.push(`/analysis/${w.symbol}`)">
+            <span class="rank-name">{{ w.name }}</span>
+            <span class="rank-code">{{ w.symbol }}</span>
+            <span class="rank-pct up">{{ fmtPct(w.changePct) }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="page-card">
+        <div class="card-head"><h4>今日跌幅榜</h4></div>
+        <div class="rank-list">
+          <div v-for="w in topLosers" :key="w.symbol" class="rank-item" @click="router.push(`/analysis/${w.symbol}`)">
+            <span class="rank-name">{{ w.name }}</span>
+            <span class="rank-code">{{ w.symbol }}</span>
+            <span class="rank-pct down">{{ fmtPct(w.changePct) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.hint { color: #909399; font-size: 12px; }
+.index-card { min-width: 0; }
+.index-row :deep(.stat-card) { flex: 1 1 190px; }
+.idx-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; gap: 4px; }
+.idx-head .label { font-size: 13px; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+.idx-head .value { font-size: 18px; }
+.u { font-size: 12px; color: #909399; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } }
+.card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.card-head h4 { font-size: 15px; }
+.vol-amount { font-size: 20px; margin-left: 6px; }
+.vol-change { font-size: 13px; color: #909399; }
+.mini-grid { display: flex; flex-wrap: wrap; }
+.mini-item { flex: 1; min-width: 88px; text-align: center; padding: 8px 4px; }
+.mini-value { font-size: 20px; font-weight: 600; }
+.mini-label { font-size: 12px; color: #909399; margin-top: 4px; }
+.rank-list { display: flex; flex-direction: column; }
+.rank-item { display: flex; align-items: center; padding: 8px 4px; border-bottom: 1px solid #f5f7fa; cursor: pointer; }
+.rank-item:last-child { border-bottom: none; }
+.rank-item:hover { background: #f5f7fa; }
+.rank-name { flex: 1; }
+.rank-code { color: #909399; font-size: 12px; margin-right: 16px; }
+.rank-pct { width: 80px; text-align: right; font-weight: 600; }
 </style>

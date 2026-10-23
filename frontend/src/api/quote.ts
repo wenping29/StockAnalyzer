@@ -1,7 +1,17 @@
 import http from './http'
 import type {
-  SearchItem, KLineResponse, PerformanceData, MoneyFlowData, WatchlistItem, AdminUser,
+  SearchItem, KLineResponse, PerformanceData, MoneyFlowData, WatchlistItem, AdminUser, MarketIndex, MarketVolume,
 } from '../types'
+
+export async function fetchMarketOverview(): Promise<MarketIndex[]> {
+  const { data } = await http.get('/quote/market-overview')
+  return data
+}
+
+export async function fetchMarketVolume(days = 30): Promise<MarketVolume> {
+  const { data } = await http.get('/quote/market-volume', { params: { days } })
+  return data
+}
 
 export async function searchSymbol(keyword: string): Promise<SearchItem[]> {
   const { data } = await http.get('/quote/search', { params: { keyword } })
