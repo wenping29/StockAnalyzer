@@ -129,6 +129,19 @@ export interface HsgtFlow {
   points: HsgtPoint[]
 }
 
+export interface FxPoint {
+  date: string
+  rate: number
+}
+
+export interface FxRate {
+  latest: number
+  latestDate: string
+  dayChangePct: number
+  monthChangePct: number | null
+  points: FxPoint[]
+}
+
 export interface LiquidityOverview {
   latestShiborDate: string
   shiborOn: number

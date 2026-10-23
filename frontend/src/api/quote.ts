@@ -1,7 +1,7 @@
 import http from './http'
 import type {
   SearchItem, KLineResponse, PerformanceData, MoneyFlowData, WatchlistItem, AdminUser,
-  MarketIndex, MarketVolume, HsgtFlow,
+  MarketIndex, MarketVolume, HsgtFlow, FxRate,
 } from '../types'
 
 export async function fetchMarketOverview(): Promise<MarketIndex[]> {
@@ -16,6 +16,11 @@ export async function fetchMarketVolume(days = 30): Promise<MarketVolume> {
 
 export async function fetchHsgtFlow(days = 30): Promise<HsgtFlow> {
   const { data } = await http.get('/quote/hsgt-flow', { params: { days } })
+  return data
+}
+
+export async function fetchFxRate(days = 90): Promise<FxRate> {
+  const { data } = await http.get('/quote/fx-rate', { params: { days } })
   return data
 }
 
