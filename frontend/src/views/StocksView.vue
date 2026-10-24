@@ -151,17 +151,19 @@ onMounted(async () => {
       <div class="page-card table-card">
         <el-table :data="items" v-loading="loading" :row-class-name="rowClass"
           @row-click="(r: StockListItem) => detailRow = r">
-          <el-table-column width="150">
+          <el-table-column label="自选" width="90" align="center">
             <template #default="{ row }">
               <el-button
                 link size="small" type="primary"
                 :disabled="watchSymbols.has(row.symbol)"
                 @click.stop="addSelf(row)"
               >{{ watchSymbols.has(row.symbol) ? '✓自选' : '＋自选' }}</el-button>
-              <el-button
-                link size="small" type="success"
-                @click.stop="router.push(`/analysis/${row.symbol}`)"
-              >详情</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column label="详情" width="70" align="center">
+            <template #default="{ row }">
+              <el-button link size="small" type="success"
+                @click.stop="router.push(`/analysis/${row.symbol}`)">详情</el-button>
             </template>
           </el-table-column>
           <el-table-column label="代码" width="90">
