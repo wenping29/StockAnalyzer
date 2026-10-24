@@ -6,6 +6,12 @@ namespace FundAnalysis.Data;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<AppUser>(options)
 {
+    // 多数据库共用一份迁移快照（SQLite/MySQL/PostgreSQL/Oracle/SqlServer 的列类型推断本就不同），
+    // 建表由 SQL 脚本/迁移手动管理，抑制"模型有挂起变更"检查
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        => optionsBuilder.ConfigureWarnings(w =>
+            w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+
     public DbSet<StockBasic> StockBasics => Set<StockBasic>();
     public DbSet<StockDaily> StockDailies => Set<StockDaily>();
     public DbSet<StockMinute> StockMinutes => Set<StockMinute>();

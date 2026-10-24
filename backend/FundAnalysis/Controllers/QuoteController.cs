@@ -300,6 +300,7 @@ public class QuoteController(
     [HttpGet("market-volume")]
     public async Task<IActionResult> MarketVolume()
     {
+        var dbgRows = await db.IndexDailies.CountAsync(); // 临时诊断
         var dto = await BuildVolumeSeriesAsync("day", 30);
         if (dto.Points.Count == 0)
         {
@@ -374,16 +375,20 @@ public class QuoteController(
         var sz = rows.Where(r => r.Code == "399106").ToDictionary(r => r.Date, r => r.Amount / 1e8);
 
         var points = sh.Keys
-            .Where(d => sz.ContainsKey(d))
+            .Union(sz.Keys)
             .OrderBy(d => d)
             .GroupBy(d => DateGroupKeys.Key(d, granularity))
             .OrderBy(g => g.Key)
             .Select(g =>
             {
                 var days = g.ToList();
-                // 日粒度取当日值；更长粒度取区间求和（成交量是流量）
-                var shv = granularity == "day" ? sh[days[0]] : days.Sum(d => sh[d]);
-                var szv = granularity == "day" ? sz[days[0]] : days.Sum(d => sz[d]);
+                // 日粒度取当日值；更长粒度取区间求和（成交量是流量）。缺失一侧按 0（数据未采集时不留白）
+                var shv = granularity == "day"
+                    ? days.Where(d => sh.ContainsKey(d)).Select(d => sh[d]).FirstOrDefault()
+                    : days.Where(d => sh.ContainsKey(d)).Sum(d => sh[d]);
+                var szv = granularity == "day"
+                    ? days.Where(d => sz.ContainsKey(d)).Select(d => sz[d]).FirstOrDefault()
+                    : days.Where(d => sz.ContainsKey(d)).Sum(d => sz[d]);
                 return new MarketVolumePointDto(
                     g.Key, Math.Round(shv, 1), Math.Round(szv, 1), Math.Round(shv + szv, 1));
             })

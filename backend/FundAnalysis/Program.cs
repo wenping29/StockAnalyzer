@@ -13,6 +13,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 
+// Npgsql 时间兼容：系统统一使用本地时间（DateTime.Now），timestamptz 列直写不要求 UTC。
+// 仅运行时启用——设计时（dotnet ef）保持默认推断，与迁移快照的列类型保持一致（避免 PendingModelChanges）
+if (!EF.IsDesignTime)
+    AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
