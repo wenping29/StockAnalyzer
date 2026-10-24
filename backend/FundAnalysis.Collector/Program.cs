@@ -13,7 +13,7 @@ builder.Configuration.AddCommandLine(args);
 builder.Services.AddDbContext<AppDbContext>(opt => opt.UseDatabase(builder.Configuration));
 builder.Services.AddHttpClient("eastmoney", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(30);
+    client.Timeout = TimeSpan.FromSeconds(10);
 })
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
     {

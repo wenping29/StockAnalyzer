@@ -218,10 +218,10 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
         return list;
     }
 
-    /// <summary>带重试的 GET：连续快速请求容易触发东财服务端断连（ResponseEnded），对瞬时网络错误重试 5 次、每次间隔递增。取消信号不重试，立即上抛。</summary>
+    /// <summary>带重试的 GET：连续快速请求容易触发东财服务端断连（ResponseEnded）。对瞬时错误仅重试 3 次、退避 150/300ms，上游真正不可达时快速失败，避免请求被长退避拖垮。取消信号不重试，立即上抛。</summary>
     private static async Task<string> GetWithRetryAsync(HttpClient client, string url, CancellationToken ct)
     {
-        const int maxAttempts = 5;
+        const int maxAttempts = 3;
         for (var attempt = 1; ; attempt++)
         {
             try
@@ -236,7 +236,7 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
             }
             catch (Exception) when (attempt < maxAttempts)
             {
-                await Task.Delay(1000 * attempt, ct);
+                await Task.Delay(150 * attempt, ct);
             }
         }
     }

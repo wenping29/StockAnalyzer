@@ -111,7 +111,7 @@ builder.Services.AddHangfireServer();
 // ---------- 业务服务 ----------
 builder.Services.AddHttpClient("eastmoney", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(30);
+    client.Timeout = TimeSpan.FromSeconds(10);
 })
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
     {

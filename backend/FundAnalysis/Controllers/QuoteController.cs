@@ -136,10 +136,14 @@ public class QuoteController(
         if (cache.TryGetValue(cacheKey, out CnBondDto? cached) && cached is not null)
             return Ok(cached);
 
-        // 三条期限并行拉取
-        var y5 = await FetchKLineSafeAsync("CN5Y", 171, 101, days, fqt: 0);
-        var y10 = await FetchKLineSafeAsync("CN10Y", 171, 101, days, fqt: 0);
-        var y30 = await FetchKLineSafeAsync("CN30Y", 171, 101, days, fqt: 0);
+        // 三条期限并行拉取（任一失败不影响其余，由 FetchKLineSafeAsync 兜底为空）
+        var y5Task = FetchKLineSafeAsync("CN5Y", 171, 101, days, fqt: 0);
+        var y10Task = FetchKLineSafeAsync("CN10Y", 171, 101, days, fqt: 0);
+        var y30Task = FetchKLineSafeAsync("CN30Y", 171, 101, days, fqt: 0);
+        await Task.WhenAll(y5Task, y10Task, y30Task);
+        var y5 = await y5Task;
+        var y10 = await y10Task;
+        var y30 = await y30Task;
         if (y10.Count == 0)
             return Ok(new CnBondDto(0, "-", 0, null, []));
 
