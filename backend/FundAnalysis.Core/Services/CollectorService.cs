@@ -399,6 +399,21 @@ public class CollectorService(AppDbContext db, IQuoteProvider provider, IConfigu
         }
     }
 
+    /// <summary>
+    /// 一键全量采集（前端"全部刷新"）：按顺序执行主要分类，后台运行、失败不自动重试。
+    /// 各子方法自带 <see cref="Hangfire.DisableConcurrentExecutionAttribute"/> 防并发。
+    /// </summary>
+    [DisableConcurrentExecution(timeoutInSeconds: 900)]
+    [AutomaticRetry(Attempts = 0)]
+    public async Task SyncAllCategoriesAsync()
+    {
+        await SyncIndicesAsync();
+        await SyncMarketIndicatorsAsync();
+        await SyncIndexIntradayAsync();
+        await SyncWatchlistDailyAsync();
+        await SyncWatchlistMinutesAsync();
+    }
+
     private async Task UpsertIndicatorSeriesAsync(string symbol, IEnumerable<(DateTime Date, double Value, double? ChangePct)> rows)
     {
         var existing = (await db.MarketIndicators

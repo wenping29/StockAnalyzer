@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import type {
   LiquidityOverview, ShiborData, MoneySupplyData, ReserveRatioData, LprData,
 } from '../types'
 import {
   fetchLiquidityOverview, fetchShibor, fetchMoneySupply, fetchReserveRatios,
-  fetchLpr, triggerLiquiditySync,
+  fetchLpr,
 } from '../api/liquidity'
+import RefreshButton from '../components/RefreshButton.vue'
 import MultiLineChart from '../components/MultiLineChart.vue'
 
 const overview = ref<LiquidityOverview | null>(null)
@@ -43,11 +43,6 @@ async function load() {
 async function reloadShibor() {
   shibor.value = null
   shibor.value = await fetchShibor(shiborDays.value)
-}
-
-async function syncNow() {
-  await triggerLiquiditySync()
-  ElMessage.success('已提交同步任务，约半分钟后刷新查看')
 }
 
 // Shibor 折线序列
@@ -107,7 +102,7 @@ onMounted(load)
         <h3>🏦 央行流动性分析</h3>
         <span class="sub">Shibor 资金面 · 货币供应 M0/M1/M2 · 政策利率（LPR / 存准率）</span>
         <div style="flex: 1" />
-        <el-button size="small" @click="syncNow">同步最新数据</el-button>
+        <RefreshButton category="liquidity" label="同步最新数据" @done="load" />
         <el-button size="small" :loading="loading" @click="load">刷新</el-button>
       </div>
     </div>

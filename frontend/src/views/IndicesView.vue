@@ -3,6 +3,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { IndexItem, IndexTrendData, KLinePoint } from '../types'
 import { fetchIndices, fetchIndexKline, fetchIndexTrend } from '../api/quote'
+import type { CollectCategory } from '../api/collect'
+import RefreshButton from '../components/RefreshButton.vue'
 import SparkLine from '../components/SparkLine.vue'
 import KLineChart from '../components/KLineChart.vue'
 import MarketMatrixChart from '../components/MarketMatrixChart.vue'
@@ -135,6 +137,19 @@ function fmtPct(v: number) {
   return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
 }
 
+// 顶部"刷新"：按当前 Tab 触发对应分类采集，后台完成后重载数据
+const refreshCategory = computed<CollectCategory>(() =>
+  tab.value === 'intraday' ? 'intraday' : 'indices'
+)
+async function onCollected() {
+  if (tab.value === 'intraday') {
+    await loadTrend()
+  } else {
+    await load()
+    await loadTabData()
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -155,6 +170,7 @@ onMounted(load)
         <span :class="pctClass(selected.changePct)">{{ fmtPct(selected.changePct) }}</span>
         <span v-if="selected.amount" class="amount">成交 {{ selected.amount >= 10000 ? (selected.amount / 10000).toFixed(2) + ' 万亿' : selected.amount.toFixed(0) + ' 亿' }}</span>
         <div style="flex: 1" />
+        <RefreshButton :category="refreshCategory" label="刷新数据" @done="onCollected" />
         <div class="detail-tabs">
           <span v-for="t in tabs" :key="t.key"
             class="detail-tab" :class="{ active: tab === t.key }" @click="pickTab(t.key)">

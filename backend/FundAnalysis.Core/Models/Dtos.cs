@@ -105,6 +105,12 @@ public record IndexTrendPointDto(string Time, double Price, double Volume, doubl
 /// </summary>
 public record IndexTrendResponse(string Code, string Name, string Date, double PrevClose, List<IndexTrendPointDto> Points);
 
+/// <summary>
+/// 手动采集作业（前端"刷新"触发）。State 取 Hangfire 作业状态：
+/// Enqueued / Processing / Succeeded / Failed / Scheduled 等。
+/// </summary>
+public record CollectJobDto(string JobId, string Category, string State, DateTime? EnqueuedAt);
+
 // ---------- 选股 ----------
 
 public record ScreenerItemDto(
