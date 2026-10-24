@@ -38,12 +38,20 @@ ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet
 | 环境变量 | 值 |
 |---|---|
 | ASPNETCORE_ENVIRONMENT | Production |
-| ASPNETCORE_URLS | http://localhost:5200 |
 | Jwt__Key | 至少32位随机串（`openssl rand -hex 32` 生成） |
 | Database__Provider | sqlite / mysql / postgresql |
 | ConnectionStrings__Default | 见下 |
 | Cors__Origins__0 | https://你的域名（跨域部署时） |
 | Collector__ScheduleEnabled | false（部署独立采集器时才关，否则保持默认） |
+
+**后端端口**：直接改 `/opt/web/appsettings.json` 的 `Server` 节即可（改完重启进程守护生效）：
+```jsonc
+"Server": {
+  "Host": "0.0.0.0",   // 0.0.0.0=所有网卡；127.0.0.1=仅本机（nginx 反代同机时更安全）
+  "Port": 5200         // 与 nginx 的 proxy_pass 端口对应
+}
+```
+优先级说明：环境变量 `ASPNETCORE_URLS` > 配置文件 Server 节 > 默认 5200。改配置文件方式请确保进程守护里**没有**设置 ASPNETCORE_URLS。
 
 连接串示例：
 ```
@@ -75,11 +83,16 @@ postgresql:
 
 1. 宝塔新建站点（绑定你的域名，申请 SSL 证书）
 2. 站点根目录上传/解压 `frontend/` 内全部文件（index.html 所在层）
-3. 站点设置 → 配置文件，参考包内 `nginx.conf`：
+3. **API 地址配置**（`frontend/config.js`）：
+   - 同域部署（nginx 反代 /api）：保持 `apiBase: ""` 默认值即可
+   - 前后端分离（前端域名 ≠ 后端地址）：改为 `apiBase: "http://后端IP:5200"`，
+     并在后端 `Cors__Origins__0` 配置前端域名
+   - 修改后刷新页面立即生效（nginx 已对此文件禁缓存）
+4. 站点设置 → 配置文件，参考包内 `nginx.conf`：
    - 关闭"防跨站攻击(open_basedir)"（或把 /opt/web 加入白名单）
    - 添加 `location /api/ { proxy_pass http://127.0.0.1:5200; ... }`
    - 添加 `location / { try_files $uri $uri/ /index.html; }`（SPA 路由回退）
-4. 若用了 Hangfire 面板，按 nginx.conf 中的 allow/deny 限制内网访问
+5. 若用了 Hangfire 面板，按 nginx.conf 中的 allow/deny 限制内网访问
 
 ---
 

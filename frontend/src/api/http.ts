@@ -1,7 +1,15 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-const http = axios.create({ baseURL: '/api', timeout: 60000 })
+// API 基地址：运行时配置 public/config.js 的 apiBase（空 = 同域，走代理）
+declare global {
+  interface Window {
+    __APP_CONFIG__?: { apiBase?: string }
+  }
+}
+const API_BASE = (window.__APP_CONFIG__?.apiBase ?? '').replace(/\/+$/, '')
+
+const http = axios.create({ baseURL: `${API_BASE}/api`, timeout: 60000 })
 
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')

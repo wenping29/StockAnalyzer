@@ -24,6 +24,13 @@ var config = builder.Configuration;
 // 支持命令行覆盖配置（例如：dotnet run -- --Database:Provider mysql）
 builder.Configuration.AddCommandLine(args);
 
+// ---------- 后端监听地址：appsettings.json 的 Server 节可自由配置 ----------
+// 优先级：命令行 --urls > 环境变量 ASPNETCORE_URLS > 这里（Server:Host/Port）> 默认 5000
+// 宝塔部署示例：appsettings.json 改 "Port": 5200，nginx 反代对应端口即可
+var serverHost = config.GetValue("Server:Host", "0.0.0.0");
+var serverPort = config.GetValue("Server:Port", 5000);
+builder.WebHost.UseUrls($"http://{serverHost}:{serverPort}");
+
 // ---------- MVC + 中文友好 JSON ----------
 builder.Services.AddControllers().AddJsonOptions(o =>
 {
