@@ -29,7 +29,23 @@ public class WatchlistController(AppDbContext db, AnalysisService analysis, IBac
     {
         var basic = await db.StockBasics.FirstOrDefaultAsync(x => x.Symbol == request.Symbol);
         if (basic is null)
-            return NotFound(new { message = $"标的 {request.Symbol} 不存在，请等待标的列表同步完成后重试" });
+        {
+            // 个股页/选股页的标的来自全市场基本面表（StockFundamental），
+            // 未在 StockBasic 注册时自动补注册（市场前缀按代码段推断）
+            var fund = await db.StockFundamentals.FirstOrDefaultAsync(x => x.Symbol == request.Symbol);
+            if (fund is null)
+                return NotFound(new { message = $"标的 {request.Symbol} 不存在" });
+
+            basic = new StockBasic
+            {
+                Symbol = fund.Symbol,
+                Name = fund.Name,
+                SecMarket = fund.Symbol.StartsWith("60") || fund.Symbol.StartsWith("68") ? 1 : 0,
+                Type = SymbolTypes.Stock,
+            };
+            db.StockBasics.Add(basic);
+            await db.SaveChangesAsync();
+        }
 
         var exists = await db.WatchlistItems.AnyAsync(x => x.UserId == UserId && x.Symbol == request.Symbol);
         if (exists)

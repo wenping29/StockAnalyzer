@@ -160,6 +160,7 @@ if (!EF.IsDesignTime)
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // 注意：数据库需预先创建（见 deploy/createdb.sql 建库脚本）；表结构由下方迁移自动创建
         await db.Database.MigrateAsync();
         await DbSeeder.SeedAsync(scope.ServiceProvider);
 

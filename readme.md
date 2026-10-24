@@ -187,7 +187,9 @@ Tushare 适配器支持：标的搜索（本地缓存清单过滤）、日线（
 
 ## 生产部署
 
-后端 `deploy/` 目录提供了完整的生产配置示例：
+**一键打包（宝塔/任意 Linux）**：Windows 开发机 Git Bash 运行 `bash deploy/pack.sh`，产出 `publish/fundanalysis-*.tar.gz`（含 Linux 版 Web 后端 + 独立采集器 + 前端 + nginx 配置 + 宝塔部署说明，默认自包含免装运行时；`bash deploy/pack.sh slim` 为小包需服务器装 .NET 10）。宝塔面板具体操作见 `deploy/baota.md`。
+
+后端 `deploy/` 目录另提供了直接部署的配置示例：
 
 | 文件 | 用途 |
 |------|------|
