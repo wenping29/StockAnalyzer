@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { StockListItem, BoardStat } from '../types'
+import { ElMessage } from 'element-plus'
+import type { StockListItem, BoardStat, WatchlistItem } from '../types'
 import { fetchStocks, fetchBoardStats } from '../api/stocks'
 import { fetchIndustries } from '../api/screener'
+import { addToWatchlist, fetchWatchlist } from '../api/quote'
 
 const router = useRouter()
 
@@ -14,6 +16,25 @@ const total = ref(0)
 const loading = ref(false)
 const page = ref(1)
 const pageSize = 20
+
+// 自选状态（用于按钮显示"加自选/已自选"）
+const watchSymbols = ref<Set<string>>(new Set())
+
+async function loadWatchlist() {
+  try {
+    const wl: WatchlistItem[] = await fetchWatchlist()
+    watchSymbols.value = new Set(wl.map((w) => w.symbol))
+  } catch {
+    watchSymbols.value = new Set()
+  }
+}
+
+async function addSelf(row: StockListItem) {
+  const res = await addToWatchlist(row.symbol)
+  ElMessage.success(res.message)
+  watchSymbols.value.add(row.symbol)
+  watchSymbols.value = new Set(watchSymbols.value)
+}
 
 const board = ref('all')
 const keyword = ref('')
@@ -81,6 +102,7 @@ function fmt(v: number | null | undefined, digits = 2) {
 
 onMounted(async () => {
   load()
+  loadWatchlist()
   fetchBoardStats().then((r) => (boards.value = r)).catch(() => {})
   fetchIndustries().then((r) => (industries.value = r)).catch(() => {})
 })
@@ -118,8 +140,15 @@ onMounted(async () => {
     <div class="page-card">
       <el-table :data="items" v-loading="loading" row-class-name="row-click"
         @row-click="(r: StockListItem) => router.push(`/analysis/${r.symbol}`)">
-        <el-table-column label="代码" width="90">
-          <template #default="{ row }">{{ row.symbol }}</template>
+        <el-table-column label="代码" width="150">
+          <template #default="{ row }">
+            <el-button
+              link size="small" type="primary"
+              :disabled="watchSymbols.has(row.symbol)"
+              @click.stop="addSelf(row)"
+            >{{ watchSymbols.has(row.symbol) ? '✓自选' : '＋自选' }}</el-button>
+            <span class="symbol-text">{{ row.symbol }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="名称" min-width="120">
           <template #default="{ row }">
@@ -198,6 +227,7 @@ onMounted(async () => {
 .board-count { font-size: 12px; opacity: 0.75; }
 .toolbar { display: flex; align-items: center; gap: 10px; }
 .dim { color: #909399; font-size: 12px; }
+.symbol-text { margin-left: 2px; }
 .th-sort { cursor: pointer; user-select: none; }
 .th-sort:hover { color: #409eff; }
 .pager { display: flex; justify-content: flex-end; margin-top: 12px; }

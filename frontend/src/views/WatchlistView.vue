@@ -56,10 +56,32 @@ async function onDeleteAlert(rule: AlertRuleDto) {
   loadAlerts()
 }
 
-// 远程搜索
-const options = ref<SearchItem[]>([])
-const searching = ref(false)
+// 远程搜索（el-autocomplete：fetch-suggestions 回调模式）
+const searchKeyword = ref("")
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+function querySearch(keyword: string, cb: (results: (SearchItem & { title: string })[]) => void) {
+  if (searchTimer) clearTimeout(searchTimer)
+  if (!keyword.trim()) {
+    cb([])
+    return
+  }
+  searchTimer = setTimeout(async () => {
+    try {
+      const items = await searchSymbol(keyword.trim())
+      cb(items.map((i) => ({ ...i, title: `${i.name} (${i.symbol})` })))
+    } catch {
+      cb([])
+    }
+  }, 300)
+}
+
+async function add(item: SearchItem & { title?: string }) {
+  const res = await addToWatchlist(item.symbol)
+  ElMessage.success(res.message)
+  searchKeyword.value = ""
+  load()
+}
 
 // 统计
 const upCount = computed(() => items.value.filter((w) => (w.changePct ?? 0) > 0).length)
@@ -79,28 +101,6 @@ async function load() {
   } finally {
     loading.value = false
   }
-}
-
-function remoteSearch(keyword: string) {
-  if (searchTimer) clearTimeout(searchTimer)
-  if (!keyword.trim()) {
-    options.value = []
-    return
-  }
-  searchTimer = setTimeout(async () => {
-    searching.value = true
-    try {
-      options.value = await searchSymbol(keyword.trim())
-    } finally {
-      searching.value = false
-    }
-  }, 300)
-}
-
-async function add(item: SearchItem) {
-  const res = await addToWatchlist(item.symbol)
-  ElMessage.success(res.message)
-  load()
 }
 
 async function remove(row: WatchlistItem) {
@@ -244,28 +244,22 @@ watch(items, renderRank)
     <!-- 自选列表 -->
     <div class="page-card">
       <div class="toolbar">
-        <el-select
-          filterable
-          remote
+        <el-autocomplete
+          v-model="searchKeyword"
+          :fetch-suggestions="querySearch"
           clearable
           placeholder="搜索代码 / 拼音 / 名称（如 600519、maotai、茅台）"
           style="width: 420px"
-          :remote-method="remoteSearch"
-          :loading="searching"
-          @change="add"
+          value-key="title"
+          @select="add"
         >
-          <el-option
-            v-for="o in options"
-            :key="o.symbol + o.type"
-            :label="`${o.name} (${o.symbol})`"
-            :value="o"
-          >
-            <span>{{ o.name }}</span>
+          <template #default="{ item }">
+            <span>{{ item.name }}</span>
             <span style="float: right; color: #909399; font-size: 12px">
-              {{ o.symbol }} · {{ typeLabel[o.type] ?? o.type }}
+              {{ item.symbol }} · {{ typeLabel[item.type] ?? item.type }}
             </span>
-          </el-option>
-        </el-select>
+          </template>
+        </el-autocomplete>
         <span class="hint">选中即加入自选，后台自动采集数据</span>
         <div style="flex: 1" />
         <el-button :loading="loading" @click="load">刷新</el-button>
