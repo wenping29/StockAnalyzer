@@ -10,6 +10,7 @@ using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 
@@ -108,7 +109,16 @@ builder.Services.AddHangfire(h =>
 builder.Services.AddHangfireServer();
 
 // ---------- 业务服务 ----------
-builder.Services.AddHttpClient("eastmoney");
+builder.Services.AddHttpClient("eastmoney", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+})
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        AutomaticDecompression = DecompressionMethods.All,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+        MaxConnectionsPerServer = 32,
+    });
 builder.Services.AddHttpClient("tushare");
 builder.Services.AddScoped<EastmoneyProvider>();
 builder.Services.AddScoped<TushareProvider>();
@@ -201,6 +211,13 @@ if (!EF.IsDesignTime)
         {
             var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
             bg.Enqueue<CollectorService>(s => s.SyncIndicesAsync());
+        }
+
+        // 首次启动时同步宏观 / 外汇日度序列（MarketIndicator，由采集器入库）
+        if (!db.MarketIndicators.Any())
+        {
+            var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+            bg.Enqueue<CollectorService>(s => s.SyncMarketIndicatorsAsync());
         }
 
         // 首次启动时同步全市场基本面数据（选股）

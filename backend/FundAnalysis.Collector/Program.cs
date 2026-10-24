@@ -3,6 +3,7 @@ using FundAnalysis.Data;
 using FundAnalysis.Services;
 using FundAnalysis.Services.Providers;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -10,7 +11,16 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Configuration.AddCommandLine(args);
 
 builder.Services.AddDbContext<AppDbContext>(opt => opt.UseDatabase(builder.Configuration));
-builder.Services.AddHttpClient("eastmoney");
+builder.Services.AddHttpClient("eastmoney", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+})
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        AutomaticDecompression = DecompressionMethods.All,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+        MaxConnectionsPerServer = 32,
+    });
 builder.Services.AddScoped<IQuoteProvider, EastmoneyProvider>();
 builder.Services.AddScoped<CollectorService>();
 builder.Services.AddScoped<LiquidityService>();
@@ -46,6 +56,7 @@ if (mode != "daemon")
         {
             case "minutes":
                 await collector.SyncWatchlistMinutesAsync();
+                await collector.SyncIndexIntradayAsync();
                 break;
             case "liquidity":
                 await liquidity.SyncAllAsync();
@@ -58,6 +69,7 @@ if (mode != "daemon")
                 await collector.SyncWatchlistDailyAsync();
                 await liquidity.SyncAllAsync();
                 await collector.SyncIndicesAsync();
+                await collector.SyncMarketIndicatorsAsync();
                 await fundamentals.SyncAllAsync();
                 break;
         }

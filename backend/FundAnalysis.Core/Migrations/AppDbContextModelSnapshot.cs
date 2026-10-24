@@ -214,6 +214,41 @@ namespace FundAnalysis.Migrations
                     b.ToTable("IndexDailies");
                 });
 
+            modelBuilder.Entity("FundAnalysis.Models.IndexIntraday", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<double>("Avg")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<double>("Price")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("Time")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<double>("Volume")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code");
+
+                    b.HasIndex("Code", "Time")
+                        .IsUnique();
+
+                    b.ToTable("IndexIntradays");
+                });
+
             modelBuilder.Entity("FundAnalysis.Models.LprRate", b =>
                 {
                     b.Property<long>("Id")
@@ -237,6 +272,38 @@ namespace FundAnalysis.Migrations
                         .IsUnique();
 
                     b.ToTable("LprRates");
+                });
+
+            modelBuilder.Entity("FundAnalysis.Models.MarketIndicator", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<double?>("ChangePct")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<double>("Value")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Symbol");
+
+                    b.HasIndex("Symbol", "Date")
+                        .IsUnique();
+
+                    b.ToTable("MarketIndicators");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.MoneyFlowDaily", b =>

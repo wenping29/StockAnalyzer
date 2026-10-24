@@ -26,7 +26,7 @@ public class CollectionScheduler(IServiceProvider services, ILogger<CollectionSc
                 var now = DateTime.Now;
                 var weekday = now.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday);
                 var afterClose = now.Hour > 16 || (now.Hour == 16 && now.Minute >= 35);
-                var inTrading = now.Hour is >= 9 and <= 15;
+                var inTrading = now.Hour is >= 9 and <= 16;
 
                 if (weekday && afterClose && lastDaily.Date != now.Date)
                 {
@@ -37,6 +37,7 @@ public class CollectionScheduler(IServiceProvider services, ILogger<CollectionSc
                     await collector.SyncWatchlistDailyAsync();
                     await liquidity.SyncAllAsync();
                     await collector.SyncIndicesAsync();
+                    await collector.SyncMarketIndicatorsAsync();
                     await fundamentals.SyncAllAsync();
                     lastDaily = now;
                     logger.LogInformation("每日全量同步完成");
@@ -47,6 +48,7 @@ public class CollectionScheduler(IServiceProvider services, ILogger<CollectionSc
                     using var scope = services.CreateScope();
                     var collector = scope.ServiceProvider.GetRequiredService<CollectorService>();
                     await collector.SyncWatchlistMinutesAsync();
+                    await collector.SyncIndexIntradayAsync();
                     lastMinutes = now;
                 }
             }

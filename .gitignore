@@ -21,3 +21,6 @@ frontend/dist/
 */obj/*
 
 publish/*
+
+# Agent 工作区数据（记忆/临时状态，不入库）
+.workbuddy/

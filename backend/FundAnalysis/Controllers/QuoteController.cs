@@ -1,6 +1,7 @@
 using FundAnalysis.Models;
 using FundAnalysis.Services;
 using FundAnalysis.Services.Providers;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +13,17 @@ namespace FundAnalysis.Controllers;
 [ApiController]
 [Route("api/quote")]
 public class QuoteController(
-    AppDbContext db, AnalysisService analysis, IQuoteProvider provider, IMemoryCache cache, HsgtService hsgt) : ControllerBase
+    AppDbContext db, AnalysisService analysis, IQuoteProvider provider, IMemoryCache cache, HsgtService hsgt,
+    ILogger<QuoteController> logger) : ControllerBase
 {
+    // 第三方接口现拉已从本控制器摘除：fx 汇率 / 美债 / 国债 / 指数日内分时均改读采集库
+    // （MarketIndicator / IndexIntraday），由独立采集器 FundAnalysis.Collector 定时入库；
+    // Web 请求路径不再依赖东财可用性，第三方故障最多导致数据陈旧，不会 500。
+    // 仅 /api/quote/search 仍实时转发东财搜索接口（searchapi 本机可达，且搜索结果无法预采集）。
+
     /// <summary>
-    /// 人民币汇率趋势（离岸 USDCNH，东财 secid 133）。数值上升 = 人民币贬值，下降 = 升值。
+    /// 人民币汇率趋势（离岸 USDCNH，读 MarketIndicator 采集表，无实时外呼）。
+    /// 数值上升 = 人民币贬值，下降 = 升值。
     /// </summary>
     [Authorize]
     [HttpGet("fx-rate")]
@@ -26,45 +34,44 @@ public class QuoteController(
         if (cache.TryGetValue(cacheKey, out FxRateDto? cached) && cached is not null)
             return Ok(cached);
 
-        var bars = await provider.FetchKLineAsync("USDCNH", 133, 101, days);
-        if (bars.Count == 0)
+        var rows = await db.MarketIndicators
+            .Where(x => x.Symbol == "USDCNH")
+            .OrderBy(x => x.Date)
+            .ToListAsync();
+        if (rows.Count == 0)
             return Ok(new FxRateDto(0, "-", 0, null, [], 0, 0));
 
-        var points = bars.Select(b => new FxPointDto(b.Time.ToString("yyyy-MM-dd"), b.Close)).ToList();
-        var last = bars[^1];
-        var dto = new FxRateDto(
-            Latest: last.Close,
-            LatestDate: last.Time.ToString("yyyy-MM-dd"),
-            DayChangePct: last.ChangePct,
-            MonthChangePct: bars.Count >= 21 && bars[^21].Close > 0
-                ? Math.Round((last.Close / bars[^21].Close - 1) * 100, 2)
-                : null,
-            Points: points,
-            ParityLatest: 0,
-            ParityChangePct: 0);
+        var cutoff = DateTime.Now.Date.AddDays(-days);
+        var recent = rows.Where(x => x.Date >= cutoff).ToList();
+        if (recent.Count == 0) recent = rows;
 
-        // 央行中间价（实时单点，东财无历史 K 线）：f43=中间价*10000，f170=日变动%
-        try
+        var points = recent.Select(r => new FxPointDto(r.Date.ToString("yyyy-MM-dd"), r.Value)).ToList();
+        var last = recent[^1];
+        var prev = recent.Count >= 2 ? recent[^2].Value : last.Value;
+        var monthAgo = recent.Count >= 21 ? recent[^21].Value : recent[0].Value;
+        var dayChangePct = prev != 0 ? Math.Round((last.Value / prev - 1) * 100, 2) : 0;
+        double? monthChangePct = monthAgo != 0 ? Math.Round((last.Value / monthAgo - 1) * 100, 2) : null;
+
+        // 在岸中间价（采集器入库的 USDCNYC 序列）
+        double parityLatest = 0, parityChangePct = 0;
+        var parity = await db.MarketIndicators
+            .Where(x => x.Symbol == "USDCNYC")
+            .OrderByDescending(x => x.Date)
+            .FirstOrDefaultAsync();
+        if (parity is not null)
         {
-            var client = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>()
-                .CreateClient("eastmoney");
-            var url = "https://push2.eastmoney.com/api/qt/stock/get?secid=120.USDCNYC&fields=f43,f170&ut=b2884a393a59ad64002292a3e90d46a5";
-            using var doc = System.Text.Json.JsonDocument.Parse(await client.GetStringAsync(url));
-            if (doc.RootElement.TryGetProperty("data", out var d) && d.ValueKind != System.Text.Json.JsonValueKind.Null)
-            {
-                dto = dto with
-                {
-                    ParityLatest = d.TryGetProperty("f43", out var f43) && f43.ValueKind == System.Text.Json.JsonValueKind.Number
-                        ? f43.GetDouble() / 10000 : 0,
-                    ParityChangePct = d.TryGetProperty("f170", out var f170) && f170.ValueKind == System.Text.Json.JsonValueKind.Number
-                        ? f170.GetDouble() / 100 : 0,
-                };
-            }
+            parityLatest = parity.Value;
+            parityChangePct = parity.ChangePct ?? 0;
         }
-        catch
-        {
-            // 中间价获取失败不影响汇率主数据
-        }
+
+        var dto = new FxRateDto(
+            Latest: last.Value,
+            LatestDate: last.Date.ToString("yyyy-MM-dd"),
+            DayChangePct: dayChangePct,
+            MonthChangePct: monthChangePct,
+            Points: points,
+            ParityLatest: parityLatest,
+            ParityChangePct: parityChangePct);
 
         cache.Set(cacheKey, dto, TimeSpan.FromMinutes(5));
         return Ok(dto);
@@ -82,19 +89,26 @@ public class QuoteController(
         if (cache.TryGetValue(cacheKey, out Us10yDto? cached) && cached is not null)
             return Ok(cached);
 
-        var bars = await provider.FetchKLineAsync("US10Y", 171, 101, days, fqt: 0);
-        if (bars.Count == 0)
+        var rows = await db.MarketIndicators
+            .Where(x => x.Symbol == "US10Y")
+            .OrderBy(x => x.Date)
+            .ToListAsync();
+        if (rows.Count == 0)
             return Ok(new Us10yDto(0, "-", 0, null, []));
 
-        var points = bars.Select(b => new FxPointDto(b.Time.ToString("yyyy-MM-dd"), b.Close)).ToList();
-        var last = bars[^1];
+        var cutoff = DateTime.Now.Date.AddDays(-days);
+        var recent = rows.Where(x => x.Date >= cutoff).ToList();
+        if (recent.Count == 0) recent = rows;
 
-        double? dayChangeBp = bars.Count >= 2 ? Math.Round((last.Close - bars[^2].Close) * 10000, 1) : null;
-        double? monthChangeBp = bars.Count >= 21 ? Math.Round((last.Close - bars[^21].Close) * 10000, 1) : null;
+        var points = recent.Select(r => new FxPointDto(r.Date.ToString("yyyy-MM-dd"), r.Value)).ToList();
+        var last = recent[^1];
+
+        double? dayChangeBp = recent.Count >= 2 ? Math.Round((last.Value - recent[^2].Value) * 10000, 1) : null;
+        double? monthChangeBp = recent.Count >= 21 ? Math.Round((last.Value - recent[^21].Value) * 10000, 1) : null;
 
         var dto = new Us10yDto(
-            Latest: last.Close,
-            LatestDate: last.Time.ToString("yyyy-MM-dd"),
+            Latest: last.Value,
+            LatestDate: last.Date.ToString("yyyy-MM-dd"),
             DayChangeBp: dayChangeBp ?? 0,
             MonthChangeBp: monthChangeBp,
             Points: points);
@@ -116,34 +130,39 @@ public class QuoteController(
         if (cache.TryGetValue(cacheKey, out CnBondDto? cached) && cached is not null)
             return Ok(cached);
 
-        // 三条期限并行拉取
-        var y5 = await provider.FetchKLineAsync("CN5Y", 171, 101, days, fqt: 0);
-        var y10 = await provider.FetchKLineAsync("CN10Y", 171, 101, days, fqt: 0);
-        var y30 = await provider.FetchKLineAsync("CN30Y", 171, 101, days, fqt: 0);
+        var y10 = await db.MarketIndicators.Where(x => x.Symbol == "CN10Y").OrderBy(x => x.Date).ToListAsync();
         if (y10.Count == 0)
             return Ok(new CnBondDto(0, "-", 0, null, []));
 
-        var y5Map = y5.ToDictionary(b => b.Time.Date, b => b.Close);
-        var y30Map = y30.ToDictionary(b => b.Time.Date, b => b.Close);
+        var y5 = await db.MarketIndicators.Where(x => x.Symbol == "CN5Y").OrderBy(x => x.Date).ToListAsync();
+        var y30 = await db.MarketIndicators.Where(x => x.Symbol == "CN30Y").OrderBy(x => x.Date).ToListAsync();
 
-        var points = y10
-            .OrderBy(b => b.Time)
+        var cutoff = DateTime.Now.Date.AddDays(-days);
+        var y10r = y10.Where(x => x.Date >= cutoff).ToList();
+        if (y10r.Count == 0) y10r = y10;
+        var y5r = y5.Where(x => x.Date >= cutoff).ToList();
+        var y30r = y30.Where(x => x.Date >= cutoff).ToList();
+        var y5Map = y5r.ToDictionary(x => x.Date, x => x.Value);
+        var y30Map = y30r.ToDictionary(x => x.Date, x => x.Value);
+
+        var points = y10r
+            .OrderBy(x => x.Date)
             .Select(b => new CnBondPointDto(
-                b.Time.ToString("yyyy-MM-dd"),
-                y5Map.GetValueOrDefault(b.Time.Date),
-                b.Close,
-                y30Map.GetValueOrDefault(b.Time.Date)))
+                b.Date.ToString("yyyy-MM-dd"),
+                y5Map.GetValueOrDefault(b.Date),
+                b.Value,
+                y30Map.GetValueOrDefault(b.Date)))
             .ToList();
 
-        var ordered = y10.OrderByDescending(b => b.Time).ToList();
+        var ordered = y10r.OrderByDescending(x => x.Date).ToList();
         var last = ordered[0];
-        var monthAgo = ordered.Count > 20 ? ordered[20] : null;
+        var monthAgo = ordered.Count > 20 ? ordered[20] : ordered[^1];
 
         var dto = new CnBondDto(
-            Latest10y: last.Close,
-            LatestDate: last.Time.ToString("yyyy-MM-dd"),
-            DayChangeBp: ordered.Count > 1 ? Math.Round((last.Close - ordered[1].Close) * 10000, 1) : 0,
-            MonthChangeBp: monthAgo is not null ? Math.Round((last.Close - monthAgo.Close) * 10000, 1) : null,
+            Latest10y: last.Value,
+            LatestDate: last.Date.ToString("yyyy-MM-dd"),
+            DayChangeBp: ordered.Count > 1 ? Math.Round((last.Value - ordered[1].Value) * 10000, 1) : 0,
+            MonthChangeBp: Math.Round((last.Value - monthAgo.Value) * 10000, 1),
             Points: points);
 
         cache.Set(cacheKey, dto, TimeSpan.FromMinutes(5));
@@ -241,6 +260,60 @@ public class QuoteController(
     }
 
     /// <summary>
+    /// 指数日内分时走势（东财实时 trends2，按指数缓存 1 分钟）。
+    /// PrevClose 取 IndexDaily 上一交易日收盘价，作为分时图昨收基准线与断轴判断依据；
+    /// 库内无历史数据（采集未完成）时 PrevClose 为 0，前端退化为不断轴模式。
+    /// </summary>
+    [Authorize]
+    [HttpGet("index-trend")]
+    public async Task<IActionResult> IndexTrend([FromQuery] string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return BadRequest(new { message = "缺少参数 code" });
+
+        var meta = MarketIndices.List.FirstOrDefault(i => i.Code == code);
+        if (meta == default) return NotFound(new { message = $"未知指数 {code}" });
+
+        var cacheKey = $"index-trend-{code}";
+        if (cache.TryGetValue(cacheKey, out IndexTrendResponse? cached) && cached is not null)
+            return Ok(cached);
+
+        // 昨收：IndexDaily 最近两个交易日（升序取第二条）；库空时为 0
+        var rows = await db.IndexDailies
+            .Where(x => x.Code == code)
+            .OrderByDescending(x => x.Date)
+            .Take(2)
+            .ToListAsync();
+        var prevClose = rows.Count >= 2 ? rows[1].Close : rows.Count == 1 ? rows[0].Close : 0;
+
+        // 最新交易日分时（库内无数据则提示暂无，不现拉第三方）
+        var latestDate = await db.IndexIntradays
+            .Where(x => x.Code == code)
+            .Select(x => x.Time.Date)
+            .Distinct()
+            .OrderByDescending(d => d)
+            .FirstOrDefaultAsync();
+        if (latestDate == default)
+            return Ok(new IndexTrendResponse(code, meta.Name, "", prevClose, []));
+
+        var trend = await db.IndexIntradays
+            .Where(x => x.Code == code && x.Time.Date == latestDate)
+            .OrderBy(x => x.Time)
+            .ToListAsync();
+
+        if (trend.Count == 0)
+            return Ok(new IndexTrendResponse(code, meta.Name, "", prevClose, []));
+
+        var dto = new IndexTrendResponse(
+            code, meta.Name, latestDate.ToString("yyyy-MM-dd"), prevClose,
+            trend.Select(t => new IndexTrendPointDto(
+                t.Time.ToString("HH:mm"), t.Price, t.Volume, t.Avg)).ToList());
+
+        cache.Set(cacheKey, dto, TimeSpan.FromMinutes(1));
+        return Ok(dto);
+    }
+
+    /// <summary>
     /// 沪深港通资金（北上/南下）：北向成交额（净流入 2024-08 起停止披露）、南向净流入/流出，近 N 日趋势。
     /// </summary>
     [Authorize]
@@ -274,19 +347,7 @@ public class QuoteController(
                 continue;
             }
 
-            // 库无数据（首次部署采集未完成）时实时兜底
-            try
-            {
-                var bars = await provider.FetchKLineAsync(code, secMarket, 101, 30, fqt: 0);
-                if (bars.Count == 0) continue;
-                var last = bars[^1];
-                result.Add(new MarketIndexDto(code, name, market, last.Close, last.ChangePct,
-                    bars.Select(b => b.Close).ToList()));
-            }
-            catch
-            {
-                // 单个指数失败不影响其余
-            }
+            // 库无数据时跳过（采集未完成），不再实时外拉第三方
         }
 
         return Ok(result);
@@ -300,29 +361,10 @@ public class QuoteController(
     [HttpGet("market-volume")]
     public async Task<IActionResult> MarketVolume()
     {
-        var dbgRows = await db.IndexDailies.CountAsync(); // 临时诊断
         var dto = await BuildVolumeSeriesAsync("day", 30);
         if (dto.Points.Count == 0)
         {
-            // 库空（指数采集未完成/风控中）时实时兜底：仅 2 个请求，触发风控风险低
-            try
-            {
-                var shBars = await provider.FetchKLineAsync("000001", 1, 101, 30, fqt: 0);
-                var szBars = await provider.FetchKLineAsync("399106", 0, 101, 30, fqt: 0);
-                var sh = shBars.ToDictionary(b => b.Time.Date, b => b.Amount / 1e8);
-                var sz = szBars.ToDictionary(b => b.Time.Date, b => b.Amount / 1e8);
-                dto = new MarketVolumeDto(0, 0, null, sh.Keys
-                    .Where(d => sz.ContainsKey(d))
-                    .OrderBy(d => d)
-                    .Select(d => new MarketVolumePointDto(
-                        d.ToString("yyyy-MM-dd"),
-                        Math.Round(sh[d], 1), Math.Round(sz[d], 1), Math.Round(sh[d] + sz[d], 1)))
-                    .ToList());
-            }
-            catch
-            {
-                return Ok(new MarketVolumeDto(0, 0, null, []));
-            }
+            // 库无数据（采集未完成）时返回空，不再实时外拉第三方
         }
 
         return Ok(new MarketVolumeDto(

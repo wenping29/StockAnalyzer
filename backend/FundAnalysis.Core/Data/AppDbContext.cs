@@ -26,6 +26,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<IndexDaily> IndexDailies => Set<IndexDaily>();
     public DbSet<StockFundamental> StockFundamentals => Set<StockFundamental>();
     public DbSet<AlertRule> AlertRules => Set<AlertRule>();
+    public DbSet<MarketIndicator> MarketIndicators => Set<MarketIndicator>();
+    public DbSet<IndexIntraday> IndexIntradays => Set<IndexIntraday>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -121,6 +123,20 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         {
             e.HasIndex(x => x.UserId);
             e.HasIndex(x => new { x.UserId, x.Symbol });
+        });
+
+        b.Entity<MarketIndicator>(e =>
+        {
+            e.HasIndex(x => new { x.Symbol, x.Date }).IsUnique();
+            e.HasIndex(x => x.Symbol);
+            e.Property(x => x.Symbol).HasMaxLength(12);
+        });
+
+        b.Entity<IndexIntraday>(e =>
+        {
+            e.HasIndex(x => new { x.Code, x.Time }).IsUnique();
+            e.HasIndex(x => x.Code);
+            e.Property(x => x.Code).HasMaxLength(12);
         });
     }
 }
