@@ -36,6 +36,11 @@ async function addSelf(row: StockListItem) {
   watchSymbols.value = new Set(watchSymbols.value)
 }
 
+// 已在自选的行加背景色
+function rowClass({ row }: { row: StockListItem }) {
+  return watchSymbols.value.has(row.symbol) ? 'in-watchlist' : ''
+}
+
 const board = ref('all')
 const keyword = ref('')
 const industry = ref('')
@@ -138,7 +143,7 @@ onMounted(async () => {
 
     <!-- 个股列表 -->
     <div class="page-card">
-      <el-table :data="items" v-loading="loading" row-class-name="row-click"
+      <el-table :data="items" v-loading="loading" :row-class-name="rowClass"
         @row-click="(r: StockListItem) => router.push(`/analysis/${r.symbol}`)">
         <el-table-column label="代码" width="150">
           <template #default="{ row }">
@@ -228,6 +233,9 @@ onMounted(async () => {
 .toolbar { display: flex; align-items: center; gap: 10px; }
 .dim { color: #909399; font-size: 12px; }
 .symbol-text { margin-left: 2px; }
+/* 已加入自选的行：淡绿背景区分 */
+:deep(tr.in-watchlist > td.el-table__cell) { background: #f0f9eb; }
+:deep(tr.in-watchlist:hover > td.el-table__cell) { background: #e1f3d8; }
 .th-sort { cursor: pointer; user-select: none; }
 .th-sort:hover { color: #409eff; }
 .pager { display: flex; justify-content: flex-end; margin-top: 12px; }

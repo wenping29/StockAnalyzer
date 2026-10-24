@@ -124,6 +124,7 @@ builder.Services.AddScoped<AnalysisService>();
 builder.Services.AddScoped<LiquidityService>();
 builder.Services.AddScoped<HsgtService>();
 builder.Services.AddScoped<FundamentalService>();
+builder.Services.AddScoped<FundService>();
 builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<TokenService>();
 
@@ -207,6 +208,13 @@ if (!EF.IsDesignTime)
         {
             var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
             bg.Enqueue<FundamentalService>(s => s.SyncAllAsync());
+        }
+
+        // 首次启动时同步全量基金清单（基金页）
+        if (!db.StockBasics.Any(x => x.Type == SymbolTypes.Fund))
+        {
+            var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+            bg.Enqueue<FundService>(s => s.SyncFundListAsync());
         }
         }
         else

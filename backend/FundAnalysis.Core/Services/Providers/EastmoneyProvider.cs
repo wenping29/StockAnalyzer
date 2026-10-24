@@ -53,6 +53,9 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
             var symbol = GetString(row, "Code");
             if (string.IsNullOrWhiteSpace(symbol)) continue;
 
+            // 场外基金代码与股票代码空间重叠，统一加 ".F" 后缀（与基金清单同步一致）
+            if (type == SymbolTypes.Fund) symbol += ".F";
+
             _ = int.TryParse(GetString(row, "MktNum"), out var secMarket);
             list.Add(new StockBasic
             {

@@ -69,8 +69,6 @@ function fmtPct(v: number) {
   return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
 }
 
-watch(period, () => {})
-
 onMounted(load)
 </script>
 

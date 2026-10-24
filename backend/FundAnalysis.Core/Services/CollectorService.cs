@@ -287,7 +287,9 @@ public class CollectorService(AppDbContext db, IQuoteProvider provider, IConfigu
 
     private async Task SyncFundNavAsync(StockBasic basic)
     {
-        var items = await provider.FetchFundNavAsync(basic.Symbol, DailyBars);
+        // 基金在 StockBasics 中的 Symbol 带 ".F" 后缀（与股票代码空间区分），查净值用裸代码
+        var fundCode = basic.Symbol.EndsWith(".F") ? basic.Symbol[..^2] : basic.Symbol;
+        var items = await provider.FetchFundNavAsync(fundCode, DailyBars);
         var existingDates = (await db.FundNavs
             .Where(x => x.FundCode == basic.Symbol)
             .Select(x => x.Date)

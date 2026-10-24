@@ -35,5 +35,9 @@ public static class CollectorJobs
         // 自选价格提醒检查：交易时段每 5 分钟
         jobs.AddOrUpdate<AlertService>(
             "alert-check", s => s.CheckAllAsync(), "*/5 9-15 * * 1-5");
+
+        // 全量基金清单（类型/名称）：每周日 9:00
+        jobs.AddOrUpdate<FundService>(
+            "fund-list-sync", s => s.SyncFundListAsync(), Cron.Weekly(DayOfWeek.Sunday, 9));
     }
 }

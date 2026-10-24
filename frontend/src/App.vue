@@ -47,6 +47,7 @@ function logout() {
         <router-link to="/">首页</router-link>
         <router-link to="/indices">指数</router-link>
         <router-link to="/stocks">个股</router-link>
+        <router-link to="/funds">基金</router-link>
         <router-link to="/watchlist">自选</router-link>
         <router-link to="/screener">选股</router-link>
         <router-link to="/liquidity">流动性</router-link>

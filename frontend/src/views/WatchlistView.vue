@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
@@ -163,7 +163,6 @@ function resize() {
 }
 
 onMounted(() => {
-  rankChart = echarts.init(rankEl.value!)
   window.addEventListener('resize', resize)
   load()
   loadAlerts()
@@ -174,7 +173,13 @@ onBeforeUnmount(() => {
   rankChart?.dispose()
 })
 
-watch(items, renderRank)
+// 收益排行图：容器在 v-if 内，等数据渲染出 DOM 后再懒初始化
+watch(items, async () => {
+  if (!items.value.length) return
+  await nextTick()
+  if (!rankChart && rankEl.value) rankChart = echarts.init(rankEl.value!)
+  renderRank()
+})
 </script>
 
 <template>

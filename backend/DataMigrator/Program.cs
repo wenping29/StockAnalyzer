@@ -44,6 +44,21 @@ if (args.Contains("--syncseq"))
     return 0;
 }
 
+// --fixfund：存量基金数据统一加 ".F" 后缀（净值/自选，与基金清单同步一致）
+if (args.Contains("--fixfund"))
+{
+    var fconn2 = new NpgsqlConnection("Host=43.142.147.244;Port=5454;Database=fund_db;Username=fundmanager;Password=admin123456");
+    await fconn2.OpenAsync();
+    await using var u1 = new NpgsqlCommand(
+        @"UPDATE ""FundNavs"" SET ""FundCode"" = ""FundCode"" || '.F' WHERE ""FundCode"" NOT LIKE '%.F'", fconn2);
+    Console.WriteLine($"FundNavs 更新 {await u1.ExecuteNonQueryAsync()} 行");
+    await using var u2 = new NpgsqlCommand(
+        @"UPDATE ""WatchlistItems"" SET ""Symbol"" = ""Symbol"" || '.F' WHERE ""Symbol"" NOT LIKE '%.F'
+          AND ""Symbol"" IN (SELECT ""Symbol"" FROM ""StockBasics"" WHERE ""Type"" = 'Fund')", fconn2);
+    Console.WriteLine($"WatchlistItems 更新 {await u2.ExecuteNonQueryAsync()} 行");
+    return 0;
+}
+
 // --codes：检查 IndexDailies 指数代码分布
 if (args.Contains("--codes"))
 {
@@ -111,6 +126,44 @@ if (args.Contains("--seed399"))
     }
     await tx.RollbackAsync(); // 测试数据回滚，不污染
     Console.WriteLine("已回滚");
+    return 0;
+}
+
+// --fixhistory：把本地全部迁移 ID 补写进 __EFMigrationsHistory（表结构已通过 SQL 手动达到最新状态时用）
+if (args.Contains("--fixhistory"))
+{
+    var migDir = Path.Combine(Environment.CurrentDirectory, "../FundAnalysis.Core/Migrations");
+    var ids = Directory.GetFiles(migDir, "*_Init.cs")
+        .Concat(Directory.GetFiles(migDir, "*.cs").Where(f => !f.EndsWith("Init.cs") && !f.EndsWith("Designer.cs") && !f.EndsWith("Snapshot.cs")))
+        .Select(Path.GetFileNameWithoutExtension)
+        .Where(n => n != "AppDbContextModelSnapshot")
+        .Distinct()
+        .ToList();
+    var fconn = new NpgsqlConnection("Host=43.142.147.244;Port=5454;Database=fund_db;Username=fundmanager;Password=admin123456");
+    await fconn.OpenAsync();
+    await using var hc = new NpgsqlCommand(
+        @"CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (""MigrationId"" text NOT NULL CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY, ""ProductVersion"" text NOT NULL)", fconn);
+    await hc.ExecuteNonQueryAsync();
+    foreach (var id in ids)
+    {
+        await using var ic = new NpgsqlCommand(
+            @"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES (@id, '10.0.13') ON CONFLICT DO NOTHING", fconn);
+        ic.Parameters.AddWithValue("id", id);
+        await ic.ExecuteNonQueryAsync();
+        Console.WriteLine($"历史已标记: {id}");
+    }
+    return 0;
+}
+
+// --addindustry：给 StockBasics 补 Industry 列（旧库升级）
+if (args.Contains("--addindustry"))
+{
+    var aconn = new NpgsqlConnection("Host=43.142.147.244;Port=5454;Database=fund_db;Username=fundmanager;Password=admin123456");
+    await aconn.OpenAsync();
+    await using var ac = new NpgsqlCommand(
+        @"ALTER TABLE ""StockBasics"" ADD COLUMN IF NOT EXISTS ""Industry"" text", aconn);
+    await ac.ExecuteNonQueryAsync();
+    Console.WriteLine("StockBasics.Industry 列已就绪");
     return 0;
 }
 

@@ -25,6 +25,8 @@ public class StockBasic
     /// <summary>东财 secid 的市场前缀：1=沪，0=深/北。</summary>
     public int SecMarket { get; set; }
     public string Type { get; set; } = SymbolTypes.Stock;
+    /// <summary>分类描述：股票=行业，基金=基金类型（股票型/混合型/债券型等）。</summary>
+    public string? Industry { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
 
