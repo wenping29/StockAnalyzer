@@ -96,6 +96,15 @@ public record IndexItemDto(string Code, string Name, string Group, double Price,
 
 public record IndicesResponse(List<IndexItemDto> Items);
 
+/// <summary>指数日内分时点。Time 为 HH:mm；Avg 为当日累计均价；Volume 单位：手。</summary>
+public record IndexTrendPointDto(string Time, double Price, double Volume, double Avg);
+
+/// <summary>
+/// 指数日内分时走势（东财实时 trends2）。PrevClose 取 IndexDaily 上一交易日收盘价，
+/// 供前端绘制昨收基准线与价格轴断轴（昨收不在当日波动区间时压缩中间空档）。
+/// </summary>
+public record IndexTrendResponse(string Code, string Name, string Date, double PrevClose, List<IndexTrendPointDto> Points);
+
 // ---------- 选股 ----------
 
 public record ScreenerItemDto(

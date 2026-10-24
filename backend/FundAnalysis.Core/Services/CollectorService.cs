@@ -311,6 +311,136 @@ public class CollectorService(AppDbContext db, IQuoteProvider provider, IConfigu
         logger.LogInformation("{Symbol} {Name} 基金净值同步完成 {Count} 条", basic.Symbol, basic.Name, items.Count);
     }
 
+    /// <summary>
+    /// 同步宏观 / 外汇日度序列（离岸人民币 USDCNH、在岸中间价 USDCNYC、十年美债 US10Y、国债 CN5Y/CN10Y/CN30Y）入库。
+    /// 全部走 push2his/push2，上游不可达时单序列失败仅记录告警，不影响其余序列与后续任务。
+    /// </summary>
+    [DisableConcurrentExecution(timeoutInSeconds: 300)]
+    public async Task SyncMarketIndicatorsAsync()
+    {
+        var series = new (string Symbol, int SecMarket, int Klt, int Limit, int Fqt)[]
+        {
+            ("USDCNH", 133, 101, 365, 1),
+            ("US10Y", 171, 101, 365, 0),
+            ("CN5Y", 171, 101, 365, 0),
+            ("CN10Y", 171, 101, 365, 0),
+            ("CN30Y", 171, 101, 365, 0),
+        };
+
+        foreach (var s in series)
+        {
+            try
+            {
+                var bars = await provider.FetchKLineAsync(s.Symbol, s.SecMarket, s.Klt, s.Limit, s.Fqt);
+                await UpsertIndicatorSeriesAsync(s.Symbol,
+                    bars.Select(b => (b.Time.Date, b.Close, (double?)null)));
+                logger.LogInformation("宏观序列 {Symbol} 入库 {Count} 条", s.Symbol, bars.Count);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "宏观序列 {Symbol} 同步失败（上游不可达？）", s.Symbol);
+            }
+        }
+
+        // 在岸中间价（push2 实时单点，本机可达）
+        try
+        {
+            var (value, chg) = await provider.FetchParityAsync();
+            if (value > 0)
+            {
+                await UpsertIndicatorAsync("USDCNYC", DateTime.Now.Date, value, chg);
+                logger.LogInformation("在岸中间价 {Value} 入库", value);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "在岸中间价同步失败");
+        }
+    }
+
+    /// <summary>
+    /// 交易时段同步内置指数日内分时（分钟级）入库。使用 push2 trends2（本机可达），
+    /// Web 端改为读库后，请求路径彻底不再现拉第三方接口。
+    /// </summary>
+    [DisableConcurrentExecution(timeoutInSeconds: 300)]
+    public async Task SyncIndexIntradayAsync()
+    {
+        foreach (var (code, _, _, market) in MarketIndices.List)
+        {
+            try
+            {
+                var trend = await provider.FetchTrendAsync(code, market);
+                if (trend.Count == 0) continue;
+
+                var existing = (await db.IndexIntradays
+                    .Where(x => x.Code == code)
+                    .Select(x => x.Time)
+                    .ToListAsync()).ToHashSet();
+
+                foreach (var t in trend)
+                {
+                    if (existing.Contains(t.Time)) continue;
+                    db.IndexIntradays.Add(new IndexIntraday
+                    {
+                        Code = code,
+                        Time = t.Time,
+                        Price = t.Price,
+                        Volume = t.Volume,
+                        Avg = t.Avg,
+                    });
+                }
+                await db.SaveChangesAsync();
+                logger.LogInformation("指数 {Code} 日内分时入库 {Count} 根", code, trend.Count);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "指数 {Code} 日内分时同步失败", code);
+            }
+        }
+    }
+
+    private async Task UpsertIndicatorSeriesAsync(string symbol, IEnumerable<(DateTime Date, double Value, double? ChangePct)> rows)
+    {
+        var existing = (await db.MarketIndicators
+            .Where(x => x.Symbol == symbol)
+            .Select(x => x.Date)
+            .ToListAsync()).ToHashSet();
+        foreach (var r in rows)
+        {
+            if (existing.Contains(r.Date)) continue;
+            db.MarketIndicators.Add(new MarketIndicator
+            {
+                Symbol = symbol,
+                Date = r.Date,
+                Value = r.Value,
+                ChangePct = r.ChangePct,
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    private async Task UpsertIndicatorAsync(string symbol, DateTime date, double value, double? changePct)
+    {
+        var existing = await db.MarketIndicators
+            .FirstOrDefaultAsync(x => x.Symbol == symbol && x.Date == date);
+        if (existing is null)
+        {
+            db.MarketIndicators.Add(new MarketIndicator
+            {
+                Symbol = symbol,
+                Date = date,
+                Value = value,
+                ChangePct = changePct,
+            });
+        }
+        else
+        {
+            existing.Value = value;
+            existing.ChangePct = changePct;
+        }
+        await db.SaveChangesAsync();
+    }
+
     /// <summary>所有用户自选 ∪ 配置中的示例标的。</summary>
     private string[] GetAllSymbols()
     {

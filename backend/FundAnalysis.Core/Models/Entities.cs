@@ -225,3 +225,35 @@ public class AlertRule
     public DateTime? LastTriggeredAt { get; set; }
     public double? LastTriggeredPrice { get; set; }
 }
+
+/// <summary>
+/// 宏观 / 外汇日度序列（由采集器定时入库，Web 端只读不现拉，隔离第三方可用性风险）。
+/// Symbol 取值：USDCNH（离岸人民币）、USDCNYC（在岸中间价）、US10Y（十年美债收益率）、
+/// CN5Y / CN10Y / CN30Y（人民币国债 5/10/30 年期收益率）。Value 单位：汇率为汇率值，债券为收益率 %。
+/// </summary>
+public class MarketIndicator
+{
+    public long Id { get; set; }
+    /// <summary>序列标识（见类注释）。</summary>
+    public string Symbol { get; set; } = "";
+    public DateTime Date { get; set; }
+    /// <summary>收盘 / 报价值。</summary>
+    public double Value { get; set; }
+    /// <summary>日变动（%）：部分来源直接提供（如中间价 f170），其余为 null，由接口按序列前后值计算。</summary>
+    public double? ChangePct { get; set; }
+}
+
+/// <summary>
+/// 指数日内分时（分钟级，由采集器交易时段定时入库；Web 端读库绘制分时图，不再在请求路径现拉东财）。
+/// Time 含交易日，查询时按 Time.Date 取最新一个交易日会话。
+/// </summary>
+public class IndexIntraday
+{
+    public long Id { get; set; }
+    public string Code { get; set; } = "";
+    public DateTime Time { get; set; }
+    public double Price { get; set; }
+    public double Volume { get; set; }
+    /// <summary>当日累计均价（服务端按分钟价累加计算）。</summary>
+    public double Avg { get; set; }
+}

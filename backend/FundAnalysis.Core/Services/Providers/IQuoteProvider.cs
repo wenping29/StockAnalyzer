@@ -5,6 +5,9 @@ namespace FundAnalysis.Services.Providers;
 /// <summary>外部行情数据提供者返回的原始条目。</summary>
 public record KLineItem(DateTime Time, double Open, double High, double Low, double Close, double Volume, double Amount, double ChangePct);
 
+/// <summary>日内分时点。Price=最新价，Avg=当日均价，Volume 单位：手。</summary>
+public record TrendPoint(DateTime Time, double Price, double Volume, double Avg);
+
 public record MoneyFlowItem(DateTime Date, double MainNet, double LargeNet, double MidNet, double SmallNet);
 
 public record FundNavItem(DateTime Date, double Nav, double AccNav, double ChangePct);
@@ -26,6 +29,12 @@ public interface IQuoteProvider
 
     /// <summary>拉取每日资金流（主力/大单/中单/小单净流入，单位元）。</summary>
     Task<List<MoneyFlowItem>> FetchMoneyFlowAsync(string symbol, int secMarket, int days, CancellationToken ct = default);
+
+    /// <summary>拉取日内分时走势（trends2，ndays=1 = 最近一个交易日的全部分钟点）。</summary>
+    Task<List<TrendPoint>> FetchTrendAsync(string symbol, int secMarket, CancellationToken ct = default);
+
+    /// <summary>拉取在岸人民币中间价（央行每日公布，push2 单点；f43=中间价×10000，f170=日变动%）。</summary>
+    Task<(double Value, double ChangePct)> FetchParityAsync(CancellationToken ct = default);
 
     /// <summary>拉取场外基金历史净值。</summary>
     Task<List<FundNavItem>> FetchFundNavAsync(string fundCode, int pageSize, CancellationToken ct = default);

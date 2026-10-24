@@ -1,9 +1,9 @@
-using System.Net;
 using FundAnalysis.Collector;
 using FundAnalysis.Data;
 using FundAnalysis.Services;
 using FundAnalysis.Services.Providers;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -56,6 +56,7 @@ if (mode != "daemon")
         {
             case "minutes":
                 await collector.SyncWatchlistMinutesAsync();
+                await collector.SyncIndexIntradayAsync();
                 break;
             case "liquidity":
                 await liquidity.SyncAllAsync();
@@ -68,6 +69,7 @@ if (mode != "daemon")
                 await collector.SyncWatchlistDailyAsync();
                 await liquidity.SyncAllAsync();
                 await collector.SyncIndicesAsync();
+                await collector.SyncMarketIndicatorsAsync();
                 await fundamentals.SyncAllAsync();
                 break;
         }

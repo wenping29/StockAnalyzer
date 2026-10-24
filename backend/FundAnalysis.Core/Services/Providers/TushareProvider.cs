@@ -186,6 +186,14 @@ public class TushareProvider(IHttpClientFactory factory, IConfiguration config, 
         return list.OrderBy(x => x.Date).ToList();
     }
 
+    // Tushare 分钟级分时接口需要较高积分，暂不支持（返回空，由调用方降级展示）
+    public Task<List<TrendPoint>> FetchTrendAsync(string symbol, int secMarket, CancellationToken ct = default)
+        => Task.FromResult(new List<TrendPoint>());
+
+    // 在岸中间价由东财推送，Tushare 未接入（返回 0，由调用方降级展示）
+    public Task<(double Value, double ChangePct)> FetchParityAsync(CancellationToken ct = default)
+        => Task.FromResult((0d, 0d));
+
     public async Task<List<FundNavItem>> FetchFundNavAsync(string fundCode, int pageSize, CancellationToken ct = default)
     {
         var data = await CallAsync("fund_nav",

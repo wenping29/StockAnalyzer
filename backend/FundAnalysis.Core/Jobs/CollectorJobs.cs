@@ -32,6 +32,14 @@ public static class CollectorJobs
         jobs.AddOrUpdate<CollectorService>(
             "indices-sync", s => s.SyncIndicesAsync(), "40 16 * * 1-5");
 
+        // 宏观 / 外汇日度序列（人民币/美债/国债，由采集器入库，Web 只读）：交易日 16:50
+        jobs.AddOrUpdate<CollectorService>(
+            "indicators-sync", s => s.SyncMarketIndicatorsAsync(), "50 16 * * 1-5");
+
+        // 指数日内分时（交易时段每 2 分钟，覆盖 A 股 15:00 与港股 16:00 收盘）：9:00-16:00
+        jobs.AddOrUpdate<CollectorService>(
+            "intraday-sync", s => s.SyncIndexIntradayAsync(), "*/2 9-16 * * 1-5");
+
         // 全市场基本面（估值+业绩，选股用）：交易日 17:10
         jobs.AddOrUpdate<FundamentalService>(
             "fundamentals-sync", s => s.SyncAllAsync(), "10 17 * * 1-5");

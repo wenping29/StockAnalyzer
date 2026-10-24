@@ -1,7 +1,7 @@
 import http from './http'
 import type {
   SearchItem, KLineResponse, PerformanceData, MoneyFlowData, WatchlistItem, AdminUser,
-  MarketIndex, MarketVolume, HsgtFlow, FxRate, Us10y, CnBond, IndexItem,
+  MarketIndex, MarketVolume, HsgtFlow, FxRate, Us10y, CnBond, IndexItem, IndexTrendData,
 } from '../types'
 
 export async function fetchMarketOverview(): Promise<MarketIndex[]> {
@@ -50,6 +50,12 @@ export async function fetchIndexKline(
   code: string, period: 'day' | 'week' | 'month', limit = 120,
 ): Promise<KLineResponse> {
   const { data } = await http.get('/quote/index-kline', { params: { code, period, limit } })
+  return data
+}
+
+/** 指数日内分时走势（东财实时，后端按指数缓存 1 分钟）。 */
+export async function fetchIndexTrend(code: string): Promise<IndexTrendData> {
+  const { data } = await http.get('/quote/index-trend', { params: { code } })
   return data
 }
 

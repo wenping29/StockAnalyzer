@@ -179,6 +179,23 @@ export interface IndicesData {
   items: IndexItem[]
 }
 
+/** 指数日内分时点。time 为 HH:mm；avg 为当日累计均价；volume 单位：手。 */
+export interface IndexTrendPoint {
+  time: string
+  price: number
+  volume: number
+  avg: number
+}
+
+/** 指数日内分时走势。prevClose 为上一交易日收盘价（0 = 库内无历史数据）。 */
+export interface IndexTrendData {
+  code: string
+  name: string
+  date: string
+  prevClose: number
+  points: IndexTrendPoint[]
+}
+
 // ---------- 选股 ----------
 
 export interface ScreenerItem {

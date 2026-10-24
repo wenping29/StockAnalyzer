@@ -20,7 +20,8 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
     {
         var client = factory.CreateClient("eastmoney");
         client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
-        // 东财 push2 / push2his 接口必须带 Referer，否则服务端会在响应中途 RST 连接（ResponseEnded）
+        // 东财 push2/push2his 对缺少 Referer 的请求会偶发在响应中途 RST（ResponseEnded），
+        // 统一带上行情站 Referer 降低反爬断连；连接复用交由连接池（短生命周期）管理
         client.DefaultRequestHeaders.Referrer = new Uri("https://quote.eastmoney.com/");
         return client;
     }
@@ -150,9 +151,55 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
         return list;
     }
 
+    /// <summary>
+    /// 日内分时走势（trends2，ndays=1 取最近一个交易日）。fields2 顺序：f51=时间, f53=最新价, f56=每分钟成交量。
+    /// 非交易时段返回最近一个交易日的完整分时数据；跨境指数（secid 100.*）以当地交易时段为准。
+    /// 注意：东财 f58 字段口径不稳定（个别数据源返回的"均价"会偏离当日价格区间），
+    /// 因此 Avg 由服务端按分钟价累计算术平均计算，保证分时图均价线始终合理。
+    /// </summary>
+    public async Task<List<TrendPoint>> FetchTrendAsync(string symbol, int secMarket, CancellationToken ct = default)
+    {
+        var url = $"https://push2.eastmoney.com/api/qt/stock/trends2/get?secid={secMarket}.{symbol}&fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f53,f56&iscr=0&ndays=1";
+        using var client = NewClient();
+        using var doc = JsonDocument.Parse(await GetWithRetryAsync(client, url, ct));
+        var list = new List<TrendPoint>();
+        if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind == JsonValueKind.Null)
+            return list;
+        if (!data.TryGetProperty("trends", out var trends) || trends.ValueKind != JsonValueKind.Array)
+            return list;
+
+        double sum = 0;
+        foreach (var el in trends.EnumerateArray())
+        {
+            // 时间,价格,成交量（分钟量）
+            var parts = el.GetString()?.Split(',') ?? [];
+            if (parts.Length < 3) continue;
+            if (!DateTime.TryParse(parts[0], Cn, DateTimeStyles.None, out var time)) continue;
+            var price = Num(parts[1]);
+            sum += price;
+            list.Add(new TrendPoint(time, price, Num(parts[2]), sum / (list.Count + 1)));
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// 在岸人民币中间价（央行每日公布，东财 secid 120.USDCNYC，push2 实时单点）。
+    /// f43 = 中间价 ×10000，f170 = 日变动 %。用于汇率页"中间价"对照（采集器入库，不在 Web 请求路径现拉）。
+    /// </summary>
+    public async Task<(double Value, double ChangePct)> FetchParityAsync(CancellationToken ct = default)
+    {
+        var url = "https://push2.eastmoney.com/api/qt/stock/get?secid=120.USDCNYC&fields=f43,f170&ut=b2884a393a59ad64002292a3e90d46a5";
+        using var client = NewClient();
+        using var doc = JsonDocument.Parse(await GetWithRetryAsync(client, url, ct));
+        if (!doc.RootElement.TryGetProperty("data", out var d) || d.ValueKind == JsonValueKind.Null)
+            return (0, 0);
+        var value = d.TryGetProperty("f43", out var f43) && f43.ValueKind == JsonValueKind.Number ? f43.GetDouble() / 10000 : 0;
+        var chg = d.TryGetProperty("f170", out var f170) && f170.ValueKind == JsonValueKind.Number ? f170.GetDouble() / 100 : 0;
+        return (value, chg);
+    }
+
     public async Task<List<MoneyFlowItem>> FetchMoneyFlowAsync(string symbol, int secMarket, int days, CancellationToken ct = default)
     {
-        // 注意：历史资金流在 push2his 的 daykline 接口；push2 的 fflow/kline 只有当天
         // 行格式：日期,主力,小单,中单,大单,超大单,主力占比,小单占比,中单占比,大单占比,超大单占比,收盘,涨跌幅
         var url = $"https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt={days}&klt=101&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65&secid={secMarket}.{symbol}";
         using var client = NewClient();
