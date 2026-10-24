@@ -1,0 +1,26 @@
+# 后端 systemd 服务示例（生产部署）
+# 保存为 /etc/systemd/system/fundanalysis.service 后：
+#   sudo systemctl daemon-reload && sudo systemctl enable --now fundanalysis
+
+[Unit]
+Description=FundAnalysis Web API
+After=network.target mysql.service
+
+[Service]
+WorkingDirectory=/opt/fundanalysis/backend
+ExecStart=/usr/bin/dotnet /opt/fundanalysis/backend/FundAnalysis.dll
+Restart=always
+RestartSec=10
+User=www-data
+
+# 生产配置全部用环境变量覆盖（不要改 appsettings.json 里的默认值）
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://localhost:5200
+Environment=Jwt__Key=请替换为至少32位随机字符串_openssl_rand_hex_32
+Environment=Database__Provider=mysql
+Environment=ConnectionStrings__Default=Server=localhost;Port=3306;Database=fund_analysis;User=fund;Password=change_me;
+Environment=Cors__Origins__0=https://fund.example.com
+Environment=Collector__ScheduleEnabled=false
+
+[Install]
+WantedBy=multi-user.target

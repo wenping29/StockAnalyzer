@@ -73,11 +73,21 @@ builder.Services.AddHangfireServer();
 
 // ---------- 业务服务 ----------
 builder.Services.AddHttpClient("eastmoney");
-builder.Services.AddScoped<IQuoteProvider, EastmoneyProvider>();
+builder.Services.AddHttpClient("tushare");
+builder.Services.AddScoped<EastmoneyProvider>();
+builder.Services.AddScoped<TushareProvider>();
+// 行情数据源可切换：Quote:Provider = eastmoney（默认）| tushare
+var quoteProvider = (config["Quote:Provider"] ?? "eastmoney").Trim().ToLowerInvariant();
+builder.Services.AddScoped<IQuoteProvider>(sp => quoteProvider switch
+{
+    "tushare" => sp.GetRequiredService<TushareProvider>(),
+    _ => sp.GetRequiredService<EastmoneyProvider>(),
+});
 builder.Services.AddScoped<CollectorService>();
 builder.Services.AddScoped<AnalysisService>();
 builder.Services.AddScoped<LiquidityService>();
 builder.Services.AddScoped<HsgtService>();
+builder.Services.AddScoped<FundamentalService>();
 builder.Services.AddScoped<TokenService>();
 
 // ---------- Swagger + CORS ----------
@@ -140,12 +150,26 @@ if (!EF.IsDesignTime)
                 bg.Enqueue<CollectorService>(s => s.InitialSyncAsync());
             }
 
-            // 首次启动时拉取央行流动性数据
-            if (!db.ShiborRates.Any())
-            {
-                var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
-                bg.Enqueue<LiquidityService>(s => s.SyncAllAsync());
-            }
+        // 首次启动时拉取央行流动性数据
+        if (!db.ShiborRates.Any())
+        {
+            var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+            bg.Enqueue<LiquidityService>(s => s.SyncAllAsync());
+        }
+
+        // 首次启动时同步内置指数清单（IndexDaily）
+        if (!db.IndexDailies.Any())
+        {
+            var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+            bg.Enqueue<CollectorService>(s => s.SyncIndicesAsync());
+        }
+
+        // 首次启动时同步全市场基本面数据（选股）
+        if (!db.StockFundamentals.Any())
+        {
+            var bg = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+            bg.Enqueue<FundamentalService>(s => s.SyncAllAsync());
+        }
         }
         else
         {
@@ -154,9 +178,35 @@ if (!EF.IsDesignTime)
     }
 }
 
-app.UseSwagger();
-app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "FundAnalysis v1"));
-app.UseCors("all");
+// ---------- 生产环境安全校验 ----------
+if (!app.Environment.IsDevelopment())
+{
+    var jwtKey = config["Jwt:Key"] ?? "";
+    if (jwtKey.Length < 32 || jwtKey.Contains("Change_Me", StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException(
+            "生产环境必须配置强 JWT 密钥：设置环境变量 Jwt__Key（至少 32 个随机字符），禁止使用默认值");
+}
+
+// ---------- Swagger：仅开发环境开放 ----------
+var showSwagger = app.Environment.IsDevelopment() || config.GetValue("Swagger:Enabled", false);
+
+if (showSwagger)
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "FundAnalysis v1"));
+}
+
+// ---------- CORS：生产环境必须配置 Cors:Origins 白名单 ----------
+var corsOrigins = config.GetSection("Cors:Origins").Get<string[]>() ?? [];
+if (corsOrigins.Length > 0)
+{
+    app.UseCors(p => p.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod());
+}
+else if (app.Environment.IsDevelopment())
+{
+    app.UseCors("all"); // 开发环境放开
+}
+// 生产环境未配置白名单则不启用 CORS（同域部署不需要）
 app.UseAuthentication();
 app.UseAuthorization();
 

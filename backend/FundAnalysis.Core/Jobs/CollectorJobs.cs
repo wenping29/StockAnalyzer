@@ -23,5 +23,13 @@ public static class CollectorJobs
         // 央行流动性数据（Shibor/货币供应/存准率/LPR）：每日 20:00
         jobs.AddOrUpdate<LiquidityService>(
             "liquidity-sync", s => s.SyncAllAsync(), "0 20 * * *");
+
+        // 内置指数清单日线（低频慢速拉取防风控）：交易日 16:40
+        jobs.AddOrUpdate<CollectorService>(
+            "indices-sync", s => s.SyncIndicesAsync(), "40 16 * * 1-5");
+
+        // 全市场基本面（估值+业绩，选股用）：交易日 17:10
+        jobs.AddOrUpdate<FundamentalService>(
+            "fundamentals-sync", s => s.SyncAllAsync(), "10 17 * * 1-5");
     }
 }

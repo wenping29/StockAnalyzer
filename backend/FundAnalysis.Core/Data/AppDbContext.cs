@@ -16,6 +16,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<MoneySupply> MoneySupplies => Set<MoneySupply>();
     public DbSet<ReserveRatio> ReserveRatios => Set<ReserveRatio>();
     public DbSet<LprRate> LprRates => Set<LprRate>();
+    public DbSet<IndexDaily> IndexDailies => Set<IndexDaily>();
+    public DbSet<StockFundamental> StockFundamentals => Set<StockFundamental>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -85,6 +87,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         b.Entity<LprRate>(e =>
         {
             e.HasIndex(x => x.Date).IsUnique();
+        });
+
+        b.Entity<IndexDaily>(e =>
+        {
+            e.HasIndex(x => new { x.Code, x.Date }).IsUnique();
+            e.HasIndex(x => x.Code);
+        });
+
+        b.Entity<StockFundamental>(e =>
+        {
+            e.HasIndex(x => x.Symbol).IsUnique();
+            e.HasIndex(x => x.Industry);
         });
     }
 }

@@ -125,79 +125,60 @@ public class QuoteController(
         return Ok(dto);
     }
 
-    /// <summary>指数页面清单（A股宽基 / 风格 / 跨境），含 30 日走势与当日成交额，缓存 60 秒。</summary>
-    private static readonly (string Code, string Name, string Group, int SecMarket)[] IndexList =
-    [
-        ("000001", "上证指数", "A股宽基", 1),
-        ("399001", "深证成指", "A股宽基", 0),
-        ("000300", "沪深300", "A股宽基", 1),
-        ("000905", "中证500", "A股宽基", 1),
-        ("000852", "中证1000", "A股宽基", 1),
-        ("000016", "上证50", "A股宽基", 1),
-        ("399330", "深证100", "A股宽基", 0),
-        ("399006", "创业板指", "A股宽基", 0),
-        ("000688", "科创50", "A股宽基", 1),
-        ("899050", "北证50", "A股宽基", 0),
-        ("000922", "中证红利", "风格与主题", 1),
-        ("HSI", "恒生指数", "跨境", 100),
-        ("NDX", "纳斯达克", "跨境", 100),
-        ("DJIA", "道琼斯", "跨境", 100),
-        ("SPX", "标普500", "跨境", 100),
-    ];
-
+    /// <summary>指数页面清单（A股宽基 / 风格 / 跨境），数据来自 IndexDaily 采集表（无实时外呼）。</summary>
     [Authorize]
     [HttpGet("indices")]
     public async Task<IActionResult> Indices()
     {
-        const string cacheKey = "indices-overview";
-        if (cache.TryGetValue(cacheKey, out IndicesResponse? cached) && cached is not null)
-            return Ok(cached);
-
         var result = new List<IndexItemDto>();
-        foreach (var idx in IndexList)
+        foreach (var (code, name, group, market) in MarketIndices.List)
         {
-            var bars = await provider.FetchKLineAsync(idx.Code, idx.SecMarket, 101, 30, fqt: 0);
-            if (bars.Count == 0) continue;
-            var last = bars[^1];
+            // 最近 31 根日线：最新快照 + 30 日迷你走势
+            var rows = await db.IndexDailies
+                .Where(x => x.Code == code)
+                .OrderByDescending(x => x.Date)
+                .Take(31)
+                .ToListAsync();
+            if (rows.Count == 0) continue;
+            rows.Reverse();
+
+            var last = rows[^1];
             result.Add(new IndexItemDto(
-                idx.Code, idx.Name, idx.Group,
+                code, name, group,
                 last.Close, last.ChangePct,
                 Math.Round(last.Amount / 1e8, 1),
-                bars.Select(b => b.Close).ToList()));
+                rows.Select(r => r.Close).ToList()));
         }
 
-        var dto = new IndicesResponse(result);
-        cache.Set(cacheKey, dto, TimeSpan.FromSeconds(60));
-        return Ok(dto);
+        return Ok(new IndicesResponse(result));
     }
 
-    /// <summary>指数 K 线（day/week/month，内存聚合，不落库），缓存 5 分钟。</summary>
+    /// <summary>指数 K 线（day/week/month，查 IndexDaily 表内存聚合，无实时外呼）。</summary>
     [Authorize]
     [HttpGet("index-kline")]
     public async Task<IActionResult> IndexKline(
-        [FromQuery] string code, [FromQuery] int market = 1,
-        [FromQuery] string period = "day", [FromQuery] int limit = 120)
+        [FromQuery] string code, [FromQuery] string period = "day", [FromQuery] int limit = 120)
     {
         if (period is not ("day" or "week" or "month"))
             return BadRequest(new { message = "period 只支持 day/week/month" });
+        limit = Math.Clamp(limit, 30, 500);
 
-        var cacheKey = $"index-kline:{code}:{period}";
-        if (cache.TryGetValue(cacheKey, out KLineResponse? cached) && cached is not null)
-            return Ok(cached);
+        var meta = MarketIndices.List.FirstOrDefault(i => i.Code == code);
+        if (meta == default) return NotFound(new { message = $"未知指数 {code}" });
 
-        limit = Math.Clamp(limit, 30, 300);
-        // 周/月线从更长的日线序列聚合
-        var fetchCount = period == "day" ? limit : 600;
-        var bars = await provider.FetchKLineAsync(code, market, 101, fetchCount, fqt: 0);
-        if (bars.Count == 0)
-            return NotFound(new { message = $"未找到指数 {code}" });
+        var rows = await db.IndexDailies
+            .Where(x => x.Code == code)
+            .OrderBy(x => x.Date)
+            .ToListAsync();
+        if (rows.Count == 0)
+            return NotFound(new { message = $"指数 {code} 暂无数据，请等待采集任务完成" });
 
         List<KLinePointDto> points;
         if (period == "day")
         {
-            points = bars
-                .Select(b => new KLinePointDto(
-                    b.Time.ToString("yyyy-MM-dd"), b.Open, b.High, b.Low, b.Close, b.Volume, b.ChangePct))
+            points = rows
+                .Select(r => new KLinePointDto(
+                    r.Date.ToString("yyyy-MM-dd"), r.Open, r.High, r.Low, r.Close, r.Volume, r.ChangePct))
                 .ToList();
         }
         else
@@ -205,19 +186,19 @@ public class QuoteController(
             Func<DateTime, string> key = period == "week"
                 ? d => d.AddDays(-((int)d.DayOfWeek + 6) % 7).ToString("yyyy-MM-dd") // 本周一
                 : d => d.ToString("yyyy-MM");
-            points = bars
-                .GroupBy(b => key(b.Time))
+            points = rows
+                .GroupBy(r => key(r.Date))
                 .OrderBy(g => g.Key)
                 .Select(g =>
                 {
-                    var sorted = g.OrderBy(b => b.Time).ToList();
+                    var sorted = g.OrderBy(r => r.Date).ToList();
                     return new KLinePointDto(
                         g.Key,
                         sorted[0].Open,
-                        sorted.Max(b => b.High),
-                        sorted.Min(b => b.Low),
+                        sorted.Max(r => r.High),
+                        sorted.Min(r => r.Low),
                         sorted[^1].Close,
-                        sorted.Sum(b => b.Volume), 0);
+                        sorted.Sum(r => r.Volume), 0);
                 })
                 .ToList();
         }
@@ -231,11 +212,7 @@ public class QuoteController(
                 points[i] = points[i] with { ChangePct = Math.Round((points[i].Close / prev - 1) * 100, 2) };
         }
 
-        var meta = IndexList.FirstOrDefault(i => i.Code == code);
-        var response = new KLineResponse(code, meta.Name, "Index", period, points);
-
-        cache.Set(cacheKey, response, TimeSpan.FromMinutes(5));
-        return Ok(response);
+        return Ok(new KLineResponse(code, meta.Name, "Index", period, points));
     }
 
     /// <summary>
@@ -246,84 +223,159 @@ public class QuoteController(
     public async Task<IActionResult> HsgtFlow([FromQuery] int days = 30)
         => Ok(await hsgt.GetFlowAsync(days));
 
-    /// <summary>市场指数快照（上证/深成/创业板/沪深300），含近 30 日走势，缓存 60 秒。</summary>
+    /// <summary>市场指数快照（上证/深成/创业板/沪深300），优先读 IndexDaily 采集表，库空时实时拉取。</summary>
     [Authorize]
     [HttpGet("market-overview")]
     public async Task<IActionResult> MarketOverview()
     {
-        const string cacheKey = "market-overview";
-        if (cache.TryGetValue(cacheKey, out List<MarketIndexDto>? cached) && cached is not null)
-            return Ok(cached);
-
-        // (代码, 名称, 所属市场板块, 东财 secid 市场前缀)
-        (string Code, string Name, string Market, int SecMarket)[] indices =
-        [
-            ("000001", "上证指数", "沪市", 1),
-            ("399001", "深证成指", "深市", 0),
-            ("399006", "创业板指", "创业板", 0),
-            ("000688", "科创50", "科创板", 1),
-            ("899050", "北证50", "北交所", 0),
-            ("000300", "沪深300", "跨市场", 1),
-        ];
-
         var result = new List<MarketIndexDto>();
-        foreach (var idx in indices)
+
+        // 首页六大板块（按展示顺序）：沪市、深市、跨市场、创业板、科创板、北交所
+        var homeCodes = new[] { "000001", "399001", "000300", "399006", "000688", "899050" };
+        foreach (var (code, name, market, secMarket) in MarketIndices.List.Where(i => homeCodes.Contains(i.Code)))
         {
-            var bars = await provider.FetchKLineAsync(idx.Code, idx.SecMarket, 101, 30);
-            if (bars.Count == 0) continue;
-            var last = bars[^1];
-            result.Add(new MarketIndexDto(idx.Code, idx.Name, idx.Market, last.Close, last.ChangePct,
-                bars.Select(b => b.Close).ToList()));
+            // 优先查库（指数由定时任务低频采集，避免实时外呼触发东财风控）
+            var rows = await db.IndexDailies
+                .Where(x => x.Code == code)
+                .OrderByDescending(x => x.Date)
+                .Take(31)
+                .ToListAsync();
+            if (rows.Count > 0)
+            {
+                rows.Reverse();
+                var last = rows[^1];
+                result.Add(new MarketIndexDto(code, name, market, last.Close, last.ChangePct,
+                    rows.Select(r => r.Close).ToList()));
+                continue;
+            }
+
+            // 库无数据（首次部署采集未完成）时实时兜底
+            try
+            {
+                var bars = await provider.FetchKLineAsync(code, secMarket, 101, 30, fqt: 0);
+                if (bars.Count == 0) continue;
+                var last = bars[^1];
+                result.Add(new MarketIndexDto(code, name, market, last.Close, last.ChangePct,
+                    bars.Select(b => b.Close).ToList()));
+            }
+            catch
+            {
+                // 单个指数失败不影响其余
+            }
         }
 
-        cache.Set(cacheKey, result, TimeSpan.FromSeconds(60));
         return Ok(result);
     }
 
     /// <summary>
-    /// 两市成交量趋势（近 N 个交易日）。沪市取上证指数成交额、深市取深证综指成交额（覆盖全部个股），
-    /// 单位亿元，缓存 60 秒。
+    /// 两市成交量（近 30 个交易日）。沪市取上证指数成交额、深市取深证综指成交额，
+    /// 数据来自 IndexDaily 采集表（库空时实时兜底），单位亿元。
     /// </summary>
     [Authorize]
     [HttpGet("market-volume")]
-    public async Task<IActionResult> MarketVolume([FromQuery] int days = 30)
+    public async Task<IActionResult> MarketVolume()
     {
-        days = Math.Clamp(days, 10, 120);
-        const string cacheKey = "market-volume";
-        if (cache.TryGetValue(cacheKey, out MarketVolumeDto? cached) && cached is not null)
-            return Ok(cached);
+        var dto = await BuildVolumeSeriesAsync("day", 30);
+        if (dto.Points.Count == 0)
+        {
+            // 库空（指数采集未完成/风控中）时实时兜底：仅 2 个请求，触发风控风险低
+            try
+            {
+                var shBars = await provider.FetchKLineAsync("000001", 1, 101, 30, fqt: 0);
+                var szBars = await provider.FetchKLineAsync("399106", 0, 101, 30, fqt: 0);
+                var sh = shBars.ToDictionary(b => b.Time.Date, b => b.Amount / 1e8);
+                var sz = szBars.ToDictionary(b => b.Time.Date, b => b.Amount / 1e8);
+                dto = new MarketVolumeDto(0, 0, null, sh.Keys
+                    .Where(d => sz.ContainsKey(d))
+                    .OrderBy(d => d)
+                    .Select(d => new MarketVolumePointDto(
+                        d.ToString("yyyy-MM-dd"),
+                        Math.Round(sh[d], 1), Math.Round(sz[d], 1), Math.Round(sh[d] + sz[d], 1)))
+                    .ToList());
+            }
+            catch
+            {
+                return Ok(new MarketVolumeDto(0, 0, null, []));
+            }
+        }
 
-        // 沪市总额：上证指数(1.000001)；深市总额：深证综指(0.399106)
-        var shBars = await provider.FetchKLineAsync("000001", 1, 101, days);
-        var szBars = await provider.FetchKLineAsync("399106", 0, 101, days);
-        if (shBars.Count == 0 || szBars.Count == 0)
-            return Ok(new MarketVolumeDto(0, 0, null, []));
+        return Ok(new MarketVolumeDto(
+            dto.Points.Count > 0 ? dto.Points[^1].Total : 0,
+            dto.Points.Count > 1 ? dto.Points[^2].Total : 0,
+            dto.Points.Count > 1 && dto.Points[^2].Total > 0
+                ? Math.Round((dto.Points[^1].Total / dto.Points[^2].Total - 1) * 100, 2)
+                : null,
+            dto.Points));
+    }
 
-        // K 线 Amount 单位为元，转亿元
-        var sh = shBars.ToDictionary(b => b.Time.Date, b => b.Amount / 1e8);
-        var sz = szBars.ToDictionary(b => b.Time.Date, b => b.Amount / 1e8);
+    /// <summary>
+    /// 两市成交量趋势（日/周/月/季度/年粒度），由 IndexDaily 日线聚合，单位亿元。
+    /// </summary>
+    [Authorize]
+    [HttpGet("market-volume-series")]
+    public async Task<IActionResult> MarketVolumeSeries([FromQuery] string granularity = "day")
+    {
+        if (granularity is not ("day" or "week" or "month" or "quarter" or "year"))
+            return BadRequest(new { message = "granularity 只支持 day/week/month/quarter/year" });
+
+        var limit = granularity switch
+        {
+            "day" => 250,    // 约一年
+            "week" => 260,   // 约 5 年
+            "month" => 84,   // 约 7 年
+            "quarter" => 28, // 约 7 年
+            _ => 10,         // year
+        };
+
+        var dto = await BuildVolumeSeriesAsync(granularity, limit);
+        return Ok(new MarketVolumeDto(
+            dto.Points.Count > 0 ? dto.Points[^1].Total : 0,
+            dto.Points.Count > 1 ? dto.Points[^2].Total : 0,
+            dto.Points.Count > 1 && dto.Points[^2].Total > 0
+                ? Math.Round((dto.Points[^1].Total / dto.Points[^2].Total - 1) * 100, 2)
+                : null,
+            dto.Points));
+    }
+
+    /// <summary>从 IndexDaily 聚合两市成交量序列（沪=上证指数 000001，深=深证综指 399106）。</summary>
+    private async Task<MarketVolumeDto> BuildVolumeSeriesAsync(string granularity, int limit)
+    {
+        var rows = await db.IndexDailies
+            .Where(x => x.Code == "000001" || x.Code == "399106")
+            .OrderBy(x => x.Date)
+            .ToListAsync();
+
+        var sh = rows.Where(r => r.Code == "000001").ToDictionary(r => r.Date, r => r.Amount / 1e8);
+        var sz = rows.Where(r => r.Code == "399106").ToDictionary(r => r.Date, r => r.Amount / 1e8);
 
         var points = sh.Keys
             .Where(d => sz.ContainsKey(d))
             .OrderBy(d => d)
-            .Select(d => new MarketVolumePointDto(
-                d.ToString("yyyy-MM-dd"),
-                Math.Round(sh[d], 1),
-                Math.Round(sz[d], 1),
-                Math.Round(sh[d] + sz[d], 1)))
+            .GroupBy(d => GranularityKey(d, granularity))
+            .OrderBy(g => g.Key)
+            .Select(g =>
+            {
+                var days = g.ToList();
+                // 日粒度取当日值；更长粒度取区间求和（成交量是流量）
+                var shv = granularity == "day" ? sh[days[0]] : days.Sum(d => sh[d]);
+                var szv = granularity == "day" ? sz[days[0]] : days.Sum(d => sz[d]);
+                return new MarketVolumePointDto(
+                    g.Key, Math.Round(shv, 1), Math.Round(szv, 1), Math.Round(shv + szv, 1));
+            })
             .ToList();
 
-        var dto = new MarketVolumeDto(
-            TodayAmount: points.Count > 0 ? points[^1].Total : 0,
-            YesterdayAmount: points.Count > 1 ? points[^2].Total : 0,
-            ChangePct: points.Count > 1 && points[^2].Total > 0
-                ? Math.Round((points[^1].Total / points[^2].Total - 1) * 100, 2)
-                : null,
-            Points: points);
-
-        cache.Set(cacheKey, dto, TimeSpan.FromSeconds(60));
-        return Ok(dto);
+        if (points.Count > limit) points = points.Skip(points.Count - limit).ToList();
+        return new MarketVolumeDto(0, 0, null, points);
     }
+
+    private static string GranularityKey(DateTime date, string granularity) => granularity switch
+    {
+        "week" => date.AddDays(-((int)date.DayOfWeek + 6) % 7).ToString("yyyy-MM-dd"), // 本周一
+        "month" => date.ToString("yyyy-MM"),
+        "quarter" => $"{date:yyyy}-Q{(date.Month - 1) / 3 + 1}",
+        "year" => date.ToString("yyyy"),
+        _ => date.ToString("yyyy-MM-dd"),
+    };
     /// <summary>标的搜索：转发东财搜索接口（代码/拼音/名称），结果自动入库供后续采集使用。</summary>
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] string keyword, [FromQuery] int limit = 20)

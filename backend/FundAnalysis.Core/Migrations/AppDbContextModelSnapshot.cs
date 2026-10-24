@@ -111,7 +111,54 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("FundCode", "Date")
                         .IsUnique();
 
-                    b.ToTable("FundNavs", (string)null);
+                    b.ToTable("FundNavs");
+                });
+
+            modelBuilder.Entity("FundAnalysis.Models.IndexDaily", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("Amount")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("ChangePct")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Close")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("High")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Low")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("Market")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("Open")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Volume")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code");
+
+                    b.HasIndex("Code", "Date")
+                        .IsUnique();
+
+                    b.ToTable("IndexDailies");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.LprRate", b =>
@@ -134,7 +181,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Date")
                         .IsUnique();
 
-                    b.ToTable("LprRates", (string)null);
+                    b.ToTable("LprRates");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.MoneyFlowDaily", b =>
@@ -167,7 +214,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Symbol", "Date")
                         .IsUnique();
 
-                    b.ToTable("MoneyFlowDailies", (string)null);
+                    b.ToTable("MoneyFlowDailies");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.MoneySupply", b =>
@@ -202,7 +249,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Month")
                         .IsUnique();
 
-                    b.ToTable("MoneySupplies", (string)null);
+                    b.ToTable("MoneySupplies");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.ReserveRatio", b =>
@@ -225,7 +272,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Date")
                         .IsUnique();
 
-                    b.ToTable("ReserveRatios", (string)null);
+                    b.ToTable("ReserveRatios");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.ShiborRate", b =>
@@ -254,7 +301,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Period", "Date")
                         .IsUnique();
 
-                    b.ToTable("ShiborRates", (string)null);
+                    b.ToTable("ShiborRates");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.StockBasic", b =>
@@ -288,7 +335,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Symbol")
                         .IsUnique();
 
-                    b.ToTable("StockBasics", (string)null);
+                    b.ToTable("StockBasics");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.StockDaily", b =>
@@ -332,7 +379,79 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Symbol", "Date")
                         .IsUnique();
 
-                    b.ToTable("StockDailies", (string)null);
+                    b.ToTable("StockDailies");
+                });
+
+            modelBuilder.Entity("FundAnalysis.Models.StockFundamental", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double?>("ChangePct")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("ClosePrice")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("GrossMargin")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Industry")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("MarketCap")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("NetMargin")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("NetProfit")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("NetProfitYoY")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("PbMrq")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("PeTtm")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("PsTtm")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime?>("ReportDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Revenue")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("RevenueYoY")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("Roe")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Industry");
+
+                    b.HasIndex("Symbol")
+                        .IsUnique();
+
+                    b.ToTable("StockFundamentals");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.StockMinute", b =>
@@ -370,7 +489,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("Symbol", "Time")
                         .IsUnique();
 
-                    b.ToTable("StockMinutes", (string)null);
+                    b.ToTable("StockMinutes");
                 });
 
             modelBuilder.Entity("FundAnalysis.Models.WatchlistItem", b =>
@@ -395,7 +514,7 @@ namespace FundAnalysis.Migrations
                     b.HasIndex("UserId", "Symbol")
                         .IsUnique();
 
-                    b.ToTable("WatchlistItems", (string)null);
+                    b.ToTable("WatchlistItems");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>

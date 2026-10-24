@@ -94,6 +94,27 @@ public record IndexItemDto(string Code, string Name, string Group, double Price,
 
 public record IndicesResponse(List<IndexItemDto> Items);
 
+// ---------- 选股 ----------
+
+public record ScreenerItemDto(
+    string Symbol, string Name, string? Industry,
+    double ClosePrice, double? PeTtm, double? PbMrq, double? MarketCap,
+    DateTime? ReportDate, double? Roe, double? NetMargin, double? GrossMargin,
+    double? RevenueYoY, double? NetProfitYoY);
+
+public record ScreenerResponse(int Total, int Page, int PageSize, List<ScreenerItemDto> Items);
+
+// ---------- 个股浏览 ----------
+
+public record StockListItemDto(
+    string Symbol, string Name, string? Industry, string Board,
+    double ClosePrice, double? ChangePct, double? PeTtm, double? PbMrq,
+    double? MarketCap, double? Roe, double? RevenueYoY, double? NetProfitYoY);
+
+public record StockListResponse(int Total, int Page, int PageSize, List<StockListItemDto> Items);
+
+public record BoardStatDto(string Key, string Name, int Count);
+
 /// <summary>沪深港通（北上/南下）资金。单位：亿元。</summary>
 public record HsgtPointDto(string Date, double NorthAmount, double SouthNetInflow, double SouthAmount);
 

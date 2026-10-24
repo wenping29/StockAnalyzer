@@ -41,6 +41,22 @@ const topGainers = computed(() =>
 const topLosers = computed(() =>
   [...watchlist.value].sort((a, b) => (a.changePct ?? 99) - (b.changePct ?? 99)).slice(0, 5))
 
+// 汇率与利率合并序列（日期并集对齐，缺失点置 null 断点）
+const mergedRates = computed(() => {
+  if (!fx.value || !us10y.value || !cnBond.value) return null
+  const fxMap = new Map(fx.value.points.map((p) => [p.date, p.rate]))
+  const usMap = new Map(us10y.value.points.map((p) => [p.date, p.rate]))
+  const cnMap = new Map(cnBond.value.points.map((p) => [p.date, p.y10]))
+  const dates = [...new Set([...fxMap.keys(), ...usMap.keys(), ...cnMap.keys()])].sort()
+  if (!dates.length) return null
+  return {
+    times: dates.map((d) => d.slice(5)),
+    usdcnh: dates.map((d) => fxMap.get(d) ?? null),
+    us10y: dates.map((d) => usMap.get(d) ?? null),
+    cn10y: dates.map((d) => cnMap.get(d) ?? null),
+  }
+})
+
 function pctClass(v: number | null | undefined) {
   return v == null ? '' : v >= 0 ? 'up' : 'down'
 }
@@ -79,9 +95,9 @@ onMounted(load)
 
 <template>
   <div v-loading="loading">
-    <!-- 市场板块指数快照 -->
+    <!-- 市场板块指数快照（点击进入指数详情） -->
     <div class="stat-cards index-row">
-      <div v-for="idx in indices" :key="idx.code" class="stat-card index-card">
+      <div v-for="idx in indices" :key="idx.code" class="stat-card index-card clickable" @click="router.push(`/indices?code=${idx.code}`)">
         <div class="idx-head">
           <span class="label">
             <el-tag size="small" effect="plain" round>{{ idx.market }}</el-tag>
@@ -94,8 +110,8 @@ onMounted(load)
       </div>
     </div>
 
-    <!-- 两市成交量 -->
-    <div class="page-card" v-if="volume && volume.points.length">
+    <!-- 两市成交量（点击进入详情） -->
+    <div class="page-card clickable-card" v-if="volume && volume.points.length" @click="router.push('/volume')">
       <div class="card-head">
         <h4>今日两市成交 <span class="vol-amount" :class="pctClass(volume.changePct)">{{ (volume.todayAmount / 10000).toFixed(2) }} 万亿</span></h4>
         <span class="vol-change">
@@ -109,6 +125,7 @@ onMounted(load)
         </span>
       </div>
       <VolumeBarChart :points="volume.points" />
+      <div class="more-hint">点击查看 日 / 周 / 月 / 季度 / 年 完整成交量分析 →</div>
     </div>
 
     <!-- 北向 / 南向资金 -->
@@ -131,60 +148,37 @@ onMounted(load)
       <HsgtChart :points="hsgt.points" />
     </div>
 
-    <!-- 汇率与利率（三列） -->
-    <div class="rate-row">
-      <div class="page-card" v-if="fx && fx.points.length">
-        <div class="card-head">
-          <h4>人民币汇率（离岸）</h4>
-          <span class="vol-amount" :class="fx.dayChangePct >= 0 ? 'down' : 'up'">{{ fx.latest.toFixed(4) }}</span>
-          <span class="vol-change" :class="fx.dayChangePct >= 0 ? 'down' : 'up'">
-            {{ fx.dayChangePct >= 0 ? '贬值' : '升值' }} {{ Math.abs(fx.dayChangePct).toFixed(2) }}%
+    <!-- 利率与汇率（合并折线图，双轴） -->
+    <div class="page-card" v-if="mergedRates">
+      <div class="card-head rate-merged-head">
+        <h4>利率与汇率</h4>
+        <div class="rate-stats" v-if="fx && us10y && cnBond">
+          <span>
+            人民币汇率 <b :class="fx.dayChangePct >= 0 ? 'down' : 'up'">{{ fx.latest.toFixed(4) }}</b>
+            <i :class="fx.dayChangePct >= 0 ? 'down' : 'up'">{{ fx.dayChangePct >= 0 ? '贬值' : '升值' }} {{ Math.abs(fx.dayChangePct).toFixed(2) }}%</i>
+          </span>
+          <span>
+            十年美债 <b :class="us10y.dayChangeBp >= 0 ? 'up' : 'down'">{{ us10y.latest.toFixed(2) }}%</b>
+            <i :class="us10y.dayChangeBp >= 0 ? 'up' : 'down'">{{ us10y.dayChangeBp >= 0 ? '+' : '' }}{{ (us10y.dayChangeBp / 100).toFixed(2) }}bp</i>
+          </span>
+          <span>
+            中国国债10Y <b :class="cnBond.dayChangeBp >= 0 ? 'up' : 'down'">{{ cnBond.latest10y.toFixed(2) }}%</b>
+            <i :class="cnBond.dayChangeBp >= 0 ? 'up' : 'down'">{{ cnBond.dayChangeBp >= 0 ? '+' : '' }}{{ (cnBond.dayChangeBp / 100).toFixed(2) }}bp</i>
+          </span>
+          <span class="spread">
+            中美利差 <b :class="(cnBond.latest10y - us10y.latest) >= 0 ? 'up' : 'down'">{{ ((cnBond.latest10y - us10y.latest) * 100).toFixed(0) }}bp</b>
           </span>
         </div>
-        <MultiLineChart
-          :times="fx.points.map((p) => p.date.slice(5))"
-          :series="[{ name: 'USDCNH', data: fx.points.map((p) => p.rate), color: '#b88230' }]"
-          unit="" />
-        <div class="hsgt-note">美元兑人民币，上升=贬值（{{ fx.latestDate }}）</div>
       </div>
-
-      <div class="page-card" v-if="us10y && us10y.points.length">
-        <div class="card-head">
-          <h4>十年期美债</h4>
-          <span class="vol-amount" :class="us10y.dayChangeBp >= 0 ? 'up' : 'down'">{{ us10y.latest.toFixed(2) }}%</span>
-          <span class="vol-change" :class="us10y.dayChangeBp >= 0 ? 'up' : 'down'">
-            {{ us10y.dayChangeBp >= 0 ? '+' : '' }}{{ (us10y.dayChangeBp / 100).toFixed(2) }}bp
-          </span>
-        </div>
-        <MultiLineChart
-          :times="us10y.points.map((p) => p.date.slice(5))"
-          :series="[{ name: 'US10Y', data: us10y.points.map((p) => p.rate), color: '#5470c6' }]"
-          unit="%" />
-        <div class="hsgt-note">
-          全球资产定价之锚（{{ us10y.latestDate }}）· 近一月 {{ (us10y.monthChangeBp ?? 0) >= 0 ? '+' : '' }}{{ ((us10y.monthChangeBp ?? 0) / 100).toFixed(2) }}bp
-        </div>
-      </div>
-
-      <div class="page-card" v-if="cnBond && cnBond.points.length">
-        <div class="card-head">
-          <h4>中国国债（10年期）</h4>
-          <span class="vol-amount" :class="cnBond.dayChangeBp >= 0 ? 'up' : 'down'">{{ cnBond.latest10y.toFixed(2) }}%</span>
-          <span class="vol-change" :class="cnBond.dayChangeBp >= 0 ? 'up' : 'down'">
-            {{ cnBond.dayChangeBp >= 0 ? '+' : '' }}{{ (cnBond.dayChangeBp / 100).toFixed(2) }}bp
-          </span>
-        </div>
-        <MultiLineChart
-          :times="cnBond.points.map((p) => p.date.slice(5))"
-          :series="[
-            { name: '30年期', data: cnBond.points.map((p) => p.y30), color: '#8d4863' },
-            { name: '10年期', data: cnBond.points.map((p) => p.y10), color: '#c23531' },
-            { name: '5年期', data: cnBond.points.map((p) => p.y5), color: '#e8a0a8' },
-          ]"
-          unit="%" />
-        <div class="hsgt-note">
-          5/10/30年期国债收益率（{{ cnBond.latestDate }}）· 中美利差 {{ ((cnBond.latest10y - (us10y?.latest ?? 0)) * 100).toFixed(0) }}bp
-        </div>
-      </div>
+      <MultiLineChart
+        :times="mergedRates.times"
+        :series="[
+          { name: '人民币汇率(USDCNH)', data: mergedRates.usdcnh, color: '#b88230', yAxis: 1 },
+          { name: '美债10Y', data: mergedRates.us10y, color: '#5470c6' },
+          { name: '中国国债10Y', data: mergedRates.cn10y, color: '#c23531' },
+        ]"
+        y-label="利率 %" y2-label="汇率" unit="%" />
+      <div class="hsgt-note">左轴：国债收益率（%）· 右轴：美元兑人民币（上升=贬值）· 汇率上涨通常伴随中美利差走阔</div>
     </div>
 
     <div class="two-col">
@@ -279,14 +273,22 @@ onMounted(load)
 <style scoped>
 .index-card { min-width: 0; }
 .index-row :deep(.stat-card) { flex: 1 1 190px; }
+.clickable { cursor: pointer; transition: all 0.15s; }
+.clickable:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+.clickable-card { cursor: pointer; transition: all 0.15s; }
+.clickable-card:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+.more-hint { text-align: right; color: #409eff; font-size: 12px; margin-top: 6px; }
 .idx-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; gap: 4px; }
 .idx-head .label { font-size: 13px; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
 .idx-head .value { font-size: 18px; }
 .u { font-size: 12px; color: #909399; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-.rate-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
-@media (max-width: 1000px) { .two-col, .rate-row { grid-template-columns: 1fr; } }
-@media (min-width: 1001px) and (max-width: 1300px) { .rate-row { grid-template-columns: 1fr 1fr; } }
+.rate-merged-head { gap: 20px; }
+.rate-stats { display: flex; gap: 28px; flex-wrap: wrap; font-size: 13px; color: #606266; }
+.rate-stats b { font-size: 16px; margin: 0 4px; }
+.rate-stats i { font-style: normal; font-size: 12px; margin-left: 2px; }
+.spread b { font-size: 16px; }
+@media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } }
 .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .card-head h4 { font-size: 15px; }
 .vol-amount { font-size: 20px; margin-left: 6px; }

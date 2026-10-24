@@ -179,6 +179,80 @@ export interface IndicesData {
   items: IndexItem[]
 }
 
+// ---------- 选股 ----------
+
+export interface ScreenerItem {
+  symbol: string
+  name: string
+  industry: string | null
+  closePrice: number
+  peTtm: number | null
+  pbMrq: number | null
+  marketCap: number | null
+  reportDate: string | null
+  roe: number | null
+  netMargin: number | null
+  grossMargin: number | null
+  revenueYoY: number | null
+  netProfitYoY: number | null
+}
+
+export interface ScreenerResponse {
+  total: number
+  page: number
+  pageSize: number
+  items: ScreenerItem[]
+}
+
+// ---------- 个股浏览 ----------
+
+export interface StockListItem {
+  symbol: string
+  name: string
+  industry: string | null
+  board: string
+  closePrice: number
+  changePct: number | null
+  peTtm: number | null
+  pbMrq: number | null
+  marketCap: number | null
+  roe: number | null
+  revenueYoY: number | null
+  netProfitYoY: number | null
+}
+
+export interface StockListResponse {
+  total: number
+  page: number
+  pageSize: number
+  items: StockListItem[]
+}
+
+export interface BoardStat {
+  key: string
+  name: string
+  count: number
+}
+
+export interface ScreenerQuery {
+  keyword?: string
+  industry?: string
+  minRoe?: number
+  maxRoe?: number
+  minPe?: number
+  maxPe?: number
+  maxPb?: number
+  minNetMargin?: number
+  minGrossMargin?: number
+  minRevenueYoy?: number
+  minNetProfitYoY?: number
+  minMarketCap?: number
+  sort?: string
+  desc?: boolean
+  page?: number
+  pageSize?: number
+}
+
 export interface LiquidityOverview {
   latestShiborDate: string
   shiborOn: number

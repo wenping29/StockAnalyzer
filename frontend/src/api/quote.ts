@@ -14,6 +14,13 @@ export async function fetchMarketVolume(days = 30): Promise<MarketVolume> {
   return data
 }
 
+export async function fetchMarketVolumeSeries(
+  granularity: 'day' | 'week' | 'month' | 'quarter' | 'year',
+): Promise<MarketVolume> {
+  const { data } = await http.get('/quote/market-volume-series', { params: { granularity } })
+  return data
+}
+
 export async function fetchHsgtFlow(days = 30): Promise<HsgtFlow> {
   const { data } = await http.get('/quote/hsgt-flow', { params: { days } })
   return data
@@ -40,9 +47,9 @@ export async function fetchIndices(): Promise<IndexItem[]> {
 }
 
 export async function fetchIndexKline(
-  code: string, market: number, period: 'day' | 'week' | 'month', limit = 120,
+  code: string, period: 'day' | 'week' | 'month', limit = 120,
 ): Promise<KLineResponse> {
-  const { data } = await http.get('/quote/index-kline', { params: { code, market, period, limit } })
+  const { data } = await http.get('/quote/index-kline', { params: { code, period, limit } })
   return data
 }
 
@@ -94,6 +101,6 @@ export async function updateUserEnabled(id: string, enabled: boolean): Promise<v
   await http.put(`/admin/users/${id}/enabled`, { enabled })
 }
 
-export async function triggerCollect(what: 'initial' | 'daily' | 'minutes'): Promise<void> {
+export async function triggerCollect(what: 'initial' | 'daily' | 'minutes' | 'indices'): Promise<void> {
   await http.post(`/admin/collect/${what}`)
 }

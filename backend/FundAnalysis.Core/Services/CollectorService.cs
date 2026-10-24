@@ -45,6 +45,65 @@ public class CollectorService(AppDbContext db, IQuoteProvider provider, IConfigu
         return match;
     }
 
+    /// <summary>
+    /// 同步内置指数清单的日线（IndexDaily）。逐个请求且间隔 2 秒——
+    /// 东财 push2his 对同 IP 高频连续请求会触发断连风控，必须低频慢速拉取。
+    /// 风控惩罚可持续数小时，重试次数放大到 30 次（按递增间隔覆盖大半天）。
+    /// </summary>
+    [DisableConcurrentExecution(timeoutInSeconds: 600)]
+    [AutomaticRetry(Attempts = 30)]
+    public async Task SyncIndicesAsync()
+    {
+        var consecutiveFailures = 0;
+
+        foreach (var (code, name, _, market) in MarketIndices.List)
+        {
+            try
+            {
+                // 1500 根约 6 年日线，支撑成交量年粒度聚合
+                var bars = await provider.FetchKLineAsync(code, market, 101, 1500, fqt: 0);
+                var existingDates = (await db.IndexDailies
+                    .Where(x => x.Code == code)
+                    .Select(x => x.Date)
+                    .ToListAsync()).ToHashSet();
+
+                var added = 0;
+                foreach (var b in bars)
+                {
+                    if (existingDates.Contains(b.Time)) continue;
+                    db.IndexDailies.Add(new IndexDaily
+                    {
+                        Code = code,
+                        Market = market,
+                        Date = b.Time,
+                        Open = b.Open,
+                        High = b.High,
+                        Low = b.Low,
+                        Close = b.Close,
+                        Volume = b.Volume,
+                        Amount = b.Amount,
+                        ChangePct = b.ChangePct,
+                    });
+                    added++;
+                }
+                await db.SaveChangesAsync();
+                logger.LogInformation("指数 {Code} {Name} 同步完成，新增 {Count} 根", code, name, added);
+                consecutiveFailures = 0;
+            }
+            catch (Exception ex)
+            {
+                consecutiveFailures++;
+                logger.LogError(ex, "指数 {Code} {Name} 同步失败（连续失败 {Count}）", code, name, consecutiveFailures);
+                // 连续 3 个失败视为触发东财 IP 风控，中止本轮（Hangfire 稍后自动重试整个任务）
+                if (consecutiveFailures >= 3)
+                    throw new InvalidOperationException("连续 3 个指数同步失败，疑似触发东财 IP 频率风控，中止本轮同步");
+            }
+
+            // 低频请求防止触发东财 IP 风控
+            await Task.Delay(2000);
+        }
+    }
+
     /// <summary>同步全市场股票/ETF 基础列表。</summary>
     public async Task SyncStockListAsync()
     {

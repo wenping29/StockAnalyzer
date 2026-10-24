@@ -6,7 +6,11 @@ const router = createRouter({
   routes: [
     { path: '/login', component: () => import('../views/LoginView.vue'), meta: { public: true } },
     { path: '/', component: () => import('../views/DashboardView.vue') },
+    { path: '/indices', component: () => import('../views/IndicesView.vue') },
+    { path: '/stocks', component: () => import('../views/StocksView.vue') },
+    { path: '/volume', component: () => import('../views/VolumeView.vue') },
     { path: '/watchlist', component: () => import('../views/WatchlistView.vue') },
+    { path: '/screener', component: () => import('../views/ScreenerView.vue') },
     { path: '/liquidity', component: () => import('../views/LiquidityView.vue') },
     { path: '/analysis/:symbol', component: () => import('../views/AnalysisView.vue'), props: true },
     { path: '/admin', component: () => import('../views/AdminView.vue'), meta: { admin: true } },

@@ -14,6 +14,7 @@ builder.Services.AddHttpClient("eastmoney");
 builder.Services.AddScoped<IQuoteProvider, EastmoneyProvider>();
 builder.Services.AddScoped<CollectorService>();
 builder.Services.AddScoped<LiquidityService>();
+builder.Services.AddScoped<FundamentalService>();
 
 // ---------- once 模式（默认）：执行一次采集即退出，供服务器 cron / K8s CronJob 调度 ----------
 // 用法示例：
@@ -36,6 +37,7 @@ if (mode != "daemon")
 
         var collector = scope.ServiceProvider.GetRequiredService<CollectorService>();
         var liquidity = scope.ServiceProvider.GetRequiredService<LiquidityService>();
+        var fundamentals = scope.ServiceProvider.GetRequiredService<FundamentalService>();
 
         logger.LogInformation("采集开始：mode=once jobs={Jobs} provider={Provider}",
             jobs, builder.Configuration["Database:Provider"]);
@@ -55,6 +57,8 @@ if (mode != "daemon")
             default: // daily
                 await collector.SyncWatchlistDailyAsync();
                 await liquidity.SyncAllAsync();
+                await collector.SyncIndicesAsync();
+                await fundamentals.SyncAllAsync();
                 break;
         }
 

@@ -139,3 +139,45 @@ public class LprRate
     public double Lpr1Y { get; set; }
     public double Lpr5Y { get; set; }
 }
+
+/// <summary>
+/// 股票基本面快照（选股用）。估值列来自东财估值表（每日），业绩列来自业绩报表（最新报告期）。
+/// 净利率 = 归母净利润 / 营业总收入（采集时计算）。
+/// </summary>
+public class StockFundamental
+{
+    public long Id { get; set; }
+    public string Symbol { get; set; } = "";
+    public string Name { get; set; } = "";
+    /// <summary>所属行业（东财板块名）。</summary>
+    public string? Industry { get; set; }
+
+    // ---------- 估值（元 / 倍 / 亿元） ----------
+    public double ClosePrice { get; set; }
+    /// <summary>当日涨跌幅（%）。</summary>
+    public double? ChangePct { get; set; }
+    public double? PeTtm { get; set; }
+    public double? PbMrq { get; set; }
+    public double? PsTtm { get; set; }
+    /// <summary>总市值（亿元）。</summary>
+    public double? MarketCap { get; set; }
+
+    // ---------- 业绩（最新报告期） ----------
+    public DateTime? ReportDate { get; set; }
+    /// <summary>营业总收入（亿元）。</summary>
+    public double Revenue { get; set; }
+    /// <summary>营收同比增长（%）。</summary>
+    public double? RevenueYoY { get; set; }
+    /// <summary>归母净利润（亿元）。</summary>
+    public double NetProfit { get; set; }
+    /// <summary>净利润同比增长（%）。</summary>
+    public double? NetProfitYoY { get; set; }
+    /// <summary>加权净资产收益率（%）。</summary>
+    public double? Roe { get; set; }
+    /// <summary>销售毛利率（%）。</summary>
+    public double? GrossMargin { get; set; }
+    /// <summary>净利率（%）= 净利润 / 营收，采集时计算。</summary>
+    public double? NetMargin { get; set; }
+
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
+}

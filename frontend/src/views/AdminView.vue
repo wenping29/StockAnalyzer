@@ -28,7 +28,7 @@ async function toggleEnabled(row: AdminUser, enabled: boolean) {
   load()
 }
 
-async function collect(what: 'initial' | 'daily' | 'minutes') {
+async function collect(what: 'initial' | 'daily' | 'minutes' | 'indices') {
   await triggerCollect(what)
   ElMessage.success('已提交后台采集任务，稍后刷新数据即可')
 }
@@ -44,6 +44,7 @@ onMounted(load)
       <h3>用户与权限管理</h3>
       <div style="flex: 1" />
       <el-button size="small" @click="collect('daily')">立即采集日线</el-button>
+      <el-button size="small" @click="collect('indices')">同步指数</el-button>
       <el-button size="small" @click="collect('minutes')">采集分钟线</el-button>
       <el-button size="small" @click="collect('initial')">初始化示例数据</el-button>
       <el-button size="small" :loading="loading" @click="load">刷新</el-button>
