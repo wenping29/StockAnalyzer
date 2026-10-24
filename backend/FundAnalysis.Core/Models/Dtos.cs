@@ -148,6 +148,13 @@ public record LprItemDto(string Date, double Lpr1Y, double Lpr5Y);
 
 public record LprResponse(List<LprItemDto> Items);
 
+/// <summary>单笔逆回购操作：开始=操作日，结束=到期日，Amount=投放量（亿元）。</summary>
+public record OmoItemDto(
+    string Date, string MaturityDate, string Term, int TermDays,
+    double Amount, double? Rate, string Announcement);
+
+public record OmoResponse(List<OmoItemDto> Items);
+
 public record LiquidityOverviewDto(
     string LatestShiborDate,
     double ShiborOn, double ShiborOnChangeBp,

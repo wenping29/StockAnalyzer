@@ -1,6 +1,6 @@
 import http from './http'
 import type {
-  LiquidityOverview, ShiborData, MoneySupplyData, ReserveRatioData, LprData,
+  LiquidityOverview, ShiborData, MoneySupplyData, ReserveRatioData, LprData, OmoData,
 } from '../types'
 
 export async function fetchLiquidityOverview(): Promise<LiquidityOverview> {
@@ -25,6 +25,11 @@ export async function fetchReserveRatios(): Promise<ReserveRatioData> {
 
 export async function fetchLpr(): Promise<LprData> {
   const { data } = await http.get('/liquidity/lpr')
+  return data
+}
+
+export async function fetchOmo(days = 90): Promise<OmoData> {
+  const { data } = await http.get('/liquidity/omo', { params: { days } })
   return data
 }
 

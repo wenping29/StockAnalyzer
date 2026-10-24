@@ -311,6 +311,49 @@ namespace FundAnalysis.Migrations
                     b.ToTable("MoneySupplies");
                 });
 
+            modelBuilder.Entity("FundAnalysis.Models.OmoOperation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<double>("Amount")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Announcement")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime>("MaturityDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<double?>("Rate")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Term")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("TermDays")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaturityDate");
+
+                    b.HasIndex("Date", "Term")
+                        .IsUnique();
+
+                    b.ToTable("OmoOperations");
+                });
+
             modelBuilder.Entity("FundAnalysis.Models.ReserveRatio", b =>
                 {
                     b.Property<long>("Id")

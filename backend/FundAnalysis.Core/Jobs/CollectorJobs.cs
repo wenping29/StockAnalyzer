@@ -24,6 +24,10 @@ public static class CollectorJobs
         jobs.AddOrUpdate<LiquidityService>(
             "liquidity-sync", s => s.SyncAllAsync(), "0 20 * * *");
 
+        // 央行逆回购公告（约 09:20 发布）：交易日 09:45 增量同步
+        jobs.AddOrUpdate<LiquidityService>(
+            "omo-sync", s => s.SyncOmoAsync(), "45 9 * * 1-5");
+
         // 内置指数清单日线（低频慢速拉取防风控）：交易日 16:40
         jobs.AddOrUpdate<CollectorService>(
             "indices-sync", s => s.SyncIndicesAsync(), "40 16 * * 1-5");

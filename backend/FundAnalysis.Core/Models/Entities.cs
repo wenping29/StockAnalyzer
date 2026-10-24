@@ -143,6 +143,29 @@ public class LprRate
 }
 
 /// <summary>
+/// 央行公开市场逆回购操作（含投放量为零的公告日，用于推进增量同步游标）。
+/// 来源：人民银行官网公开市场业务交易公告，到期日按交易日历顺延计算。
+/// </summary>
+public class OmoOperation
+{
+    public long Id { get; set; }
+    /// <summary>操作日期（投放开始日，公告发布当天）。</summary>
+    public DateTime Date { get; set; }
+    /// <summary>到期日期（投放结束日；操作日 + 期限自然日，顺延至交易日）。</summary>
+    public DateTime MaturityDate { get; set; }
+    /// <summary>期限描述（隔夜 / 7天 / 14天 / 3个月…）。</summary>
+    public string Term { get; set; } = "";
+    /// <summary>期限换算的自然日天数（隔夜=1，N个月≈30N），供排序与展示。</summary>
+    public int TermDays { get; set; }
+    /// <summary>中标量 / 投放量（亿元）。公告"操作量为零"时为 0。</summary>
+    public double Amount { get; set; }
+    /// <summary>操作利率（%）。公告未披露（新版格式）时为 null。</summary>
+    public double? Rate { get; set; }
+    /// <summary>公告标题（如 公开市场业务交易公告 [2026]第205号）。</summary>
+    public string Announcement { get; set; } = "";
+}
+
+/// <summary>
 /// 股票基本面快照（选股用）。估值列来自东财估值表（每日），业绩列来自业绩报表（最新报告期）。
 /// 净利率 = 归母净利润 / 营业总收入（采集时计算）。
 /// </summary>

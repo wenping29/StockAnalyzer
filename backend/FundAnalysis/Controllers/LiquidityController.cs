@@ -37,6 +37,11 @@ public class LiquidityController(LiquidityService liquidity, IBackgroundJobClien
     public async Task<IActionResult> Lpr()
         => Ok(await liquidity.GetLprAsync());
 
+    /// <summary>央行逆回购投放与到期（甘特图数据：操作日→到期日、投放量）。</summary>
+    [HttpGet("omo")]
+    public async Task<IActionResult> Omo([FromQuery] int days = 90)
+        => Ok(await liquidity.GetOmoAsync(Math.Clamp(days, 30, 720)));
+
     /// <summary>手动触发流动性数据同步。</summary>
     [HttpPost("sync")]
     public IActionResult Sync()

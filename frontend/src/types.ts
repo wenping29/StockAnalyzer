@@ -331,3 +331,17 @@ export interface LprItem {
 export interface LprData {
   items: LprItem[]
 }
+
+export interface OmoItem {
+  date: string
+  maturityDate: string
+  term: string
+  termDays: number
+  amount: number
+  rate: number | null
+  announcement: string
+}
+
+export interface OmoData {
+  items: OmoItem[]
+}
