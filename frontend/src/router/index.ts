@@ -1,8 +1,10 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
+// hash 路由（/#/stocks 形式）：地址的 # 后部分不会发送给服务器，
+// 任何静态托管（宝塔 nginx 默认配置、对象存储等）都不会再出现刷新 404
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes: [
     { path: '/login', component: () => import('../views/LoginView.vue'), meta: { public: true } },
     { path: '/', component: () => import('../views/DashboardView.vue') },
@@ -15,7 +17,7 @@ const router = createRouter({
     { path: '/liquidity', component: () => import('../views/LiquidityView.vue') },
     { path: '/analysis/:symbol', component: () => import('../views/AnalysisView.vue'), props: true },
     { path: '/admin', component: () => import('../views/AdminView.vue'), meta: { admin: true } },
-    { path: '/:pathMatch(.*)*', redirect: '/' },
+    { path: '/:pathMatch(.*)*', component: () => import('../views/NotFoundView.vue') },
   ],
 })
 

@@ -88,10 +88,9 @@ postgresql:
    - 前后端分离（前端域名 ≠ 后端地址）：改为 `apiBase: "http://后端IP:5200"`，
      并在后端 `Cors__Origins__0` 配置前端域名
    - 修改后刷新页面立即生效（nginx 已对此文件禁缓存）
-4. 站点设置 → 配置文件，参考包内 `nginx.conf`：
-   - 关闭"防跨站攻击(open_basedir)"（或把 /opt/web 加入白名单）
-   - 添加 `location /api/ { proxy_pass http://127.0.0.1:5200; ... }`
-   - 添加 `location / { try_files $uri $uri/ /index.html; }`（SPA 路由回退）
+4. **SPA 路由**：前端使用 hash 路由（URL 形如 `/#/stocks`），nginx **无需任何回退配置**，
+   刷新/直链子页面都不会 404。如仍使用旧版 history 路由包，才需要：
+   `location / { try_files $uri $uri/ /index.html; }`
 5. 若用了 Hangfire 面板，按 nginx.conf 中的 allow/deny 限制内网访问
 
 ---

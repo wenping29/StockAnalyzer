@@ -7,8 +7,14 @@ import './style.css'
 import App from './App.vue'
 import router from './router'
 
-createApp(App)
-  .use(createPinia())
-  .use(router)
-  .use(ElementPlus, { locale: zhCn })
-  .mount('#app')
+const app = createApp(App)
+app.use(createPinia())
+app.use(router)
+app.use(ElementPlus, { locale: zhCn })
+
+// 全局错误钩子：生产环境排障用（控制台会带 [AppError] 前缀，便于搜索）
+app.config.errorHandler = (err, _instance, info) => {
+  console.error(`[AppError] ${info}:`, err)
+}
+
+app.mount('#app')
