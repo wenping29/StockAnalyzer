@@ -17,6 +17,48 @@ namespace FundAnalysis.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
+            modelBuilder.Entity("FundAnalysis.Models.AlertRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastTriggeredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("LastTriggeredPrice")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("RuleType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Threshold")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "Symbol");
+
+                    b.ToTable("AlertRules");
+                });
+
             modelBuilder.Entity("FundAnalysis.Models.AppUser", b =>
                 {
                     b.Property<string>("Id")

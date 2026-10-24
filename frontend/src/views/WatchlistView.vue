@@ -3,14 +3,58 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import type { SearchItem, WatchlistItem } from '../types'
+import type { SearchItem, WatchlistItem, AlertRuleDto } from '../types'
 import {
   fetchWatchlist, addToWatchlist, removeFromWatchlist, searchSymbol,
 } from '../api/quote'
+import { fetchAlerts, createAlert, toggleAlert, deleteAlert } from '../api/alerts'
 
 const router = useRouter()
 const items = ref<WatchlistItem[]>([])
 const loading = ref(false)
+
+// ---------- 提醒 ----------
+const alerts = ref<AlertRuleDto[]>([])
+const alertDialog = ref(false)
+const alertTarget = ref<WatchlistItem | null>(null)
+const alertForm = ref({ ruleType: 'PriceAbove' as AlertRuleDto['ruleType'], threshold: undefined as number | undefined })
+
+const RULE_LABEL: Record<string, string> = {
+  PriceAbove: '价格高于', PriceBelow: '价格低于', ChangePctUp: '日涨幅超%', ChangePctDown: '日跌幅超%',
+}
+
+async function loadAlerts() {
+  try {
+    alerts.value = await fetchAlerts()
+  } catch {
+    alerts.value = []
+  }
+}
+
+function openAlertDialog(row: WatchlistItem) {
+  alertTarget.value = row
+  alertForm.value = { ruleType: 'PriceAbove', threshold: row.latestPrice ? +row.latestPrice.toFixed(2) : undefined }
+  alertDialog.value = true
+}
+
+async function submitAlert() {
+  if (!alertTarget.value || alertForm.value.threshold == null) return ElMessage.warning('请填写阈值')
+  await createAlert(alertTarget.value.symbol, alertForm.value.ruleType, alertForm.value.threshold)
+  ElMessage.success('提醒已创建')
+  alertDialog.value = false
+  loadAlerts()
+}
+
+async function onToggleAlert(rule: AlertRuleDto) {
+  await toggleAlert(rule.id)
+  loadAlerts()
+}
+
+async function onDeleteAlert(rule: AlertRuleDto) {
+  await deleteAlert(rule.id)
+  ElMessage.success('已删除')
+  loadAlerts()
+}
 
 // 远程搜索
 const options = ref<SearchItem[]>([])
@@ -122,6 +166,7 @@ onMounted(() => {
   rankChart = echarts.init(rankEl.value!)
   window.addEventListener('resize', resize)
   load()
+  loadAlerts()
 })
 
 onBeforeUnmount(() => {
@@ -162,6 +207,38 @@ watch(items, renderRank)
     <div class="page-card" v-if="items.length">
       <div class="chart-toolbar"><span class="chart-title">自选近1月收益排行</span></div>
       <div ref="rankEl" style="width: 100%; height: 300px" />
+    </div>
+
+    <!-- 提醒规则 -->
+    <div class="page-card" v-if="alerts.length">
+      <div class="chart-toolbar"><span class="chart-title">价格提醒（触发后自动停用，可重新启用）</span></div>
+      <el-table :data="alerts" size="small">
+        <el-table-column label="标的" width="150">
+          <template #default="{ row }">{{ row.name ?? row.symbol }} <span class="dim">{{ row.symbol }}</span></template>
+        </el-table-column>
+        <el-table-column label="规则" width="160">
+          <template #default="{ row }">{{ RULE_LABEL[row.ruleType] }} {{ row.threshold }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '监控中' : '已触发/停用' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="最近触发" min-width="170">
+          <template #default="{ row }">
+            <span v-if="row.lastTriggeredAt">
+              {{ new Date(row.lastTriggeredAt).toLocaleString() }} · 价格 {{ row.lastTriggeredPrice }}
+            </span>
+            <span v-else class="dim">未触发</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="130" align="center">
+          <template #default="{ row }">
+            <el-button link size="small" @click="onToggleAlert(row)">{{ row.enabled ? '停用' : '重启' }}</el-button>
+            <el-button link size="small" type="danger" @click="onDeleteAlert(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
 
     <!-- 自选列表 -->
@@ -222,8 +299,9 @@ watch(items, renderRank)
             <span :class="pctClass(row.mainNetIn5d)">{{ fmtYi(row.mainNetIn5d) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="90" align="center">
+        <el-table-column label="操作" width="130" align="center">
           <template #default="{ row }">
+            <el-button link type="primary" @click.stop="openAlertDialog(row)">提醒</el-button>
             <el-button link type="danger" @click.stop="remove(row)">移除</el-button>
           </template>
         </el-table-column>
@@ -232,6 +310,31 @@ watch(items, renderRank)
         </template>
       </el-table>
     </div>
+
+    <!-- 创建提醒对话框 -->
+    <el-dialog v-model="alertDialog" :title="`创建提醒 - ${alertTarget?.name ?? ''} (${alertTarget?.symbol ?? ''})`" width="400px">
+      <el-form label-width="90px">
+        <el-form-item label="规则">
+          <el-select v-model="alertForm.ruleType">
+            <el-option value="PriceAbove" label="价格高于（元）" />
+            <el-option value="PriceBelow" label="价格低于（元）" />
+            <el-option value="ChangePctUp" label="日涨幅超过（%）" />
+            <el-option value="ChangePctDown" label="日跌幅超过（%）" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="阈值">
+          <el-input-number v-model="alertForm.threshold" :step="alertForm.ruleType.startsWith('Price') ? 0.1 : 1"
+            :precision="2" controls-position="right" style="width: 180px" />
+        </el-form-item>
+        <el-form-item>
+          <span class="dim">交易时段每 5 分钟检查一次，触发后自动停用</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="alertDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitAlert">创建</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -240,4 +343,5 @@ watch(items, renderRank)
 .hint { color: #909399; font-size: 12px; }
 .chart-toolbar { display: flex; align-items: center; margin-bottom: 8px; }
 .chart-title { color: #606266; font-size: 13px; }
+.dim { color: #c0c4cc; font-size: 12px; }
 </style>

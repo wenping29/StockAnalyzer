@@ -28,7 +28,7 @@ public class QuoteController(
 
         var bars = await provider.FetchKLineAsync("USDCNH", 133, 101, days);
         if (bars.Count == 0)
-            return Ok(new FxRateDto(0, "-", 0, null, []));
+            return Ok(new FxRateDto(0, "-", 0, null, [], 0, 0));
 
         var points = bars.Select(b => new FxPointDto(b.Time.ToString("yyyy-MM-dd"), b.Close)).ToList();
         var last = bars[^1];
@@ -39,7 +39,32 @@ public class QuoteController(
             MonthChangePct: bars.Count >= 21 && bars[^21].Close > 0
                 ? Math.Round((last.Close / bars[^21].Close - 1) * 100, 2)
                 : null,
-            Points: points);
+            Points: points,
+            ParityLatest: 0,
+            ParityChangePct: 0);
+
+        // 央行中间价（实时单点，东财无历史 K 线）：f43=中间价*10000，f170=日变动%
+        try
+        {
+            var client = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>()
+                .CreateClient("eastmoney");
+            var url = "https://push2.eastmoney.com/api/qt/stock/get?secid=120.USDCNYC&fields=f43,f170&ut=b2884a393a59ad64002292a3e90d46a5";
+            using var doc = System.Text.Json.JsonDocument.Parse(await client.GetStringAsync(url));
+            if (doc.RootElement.TryGetProperty("data", out var d) && d.ValueKind != System.Text.Json.JsonValueKind.Null)
+            {
+                dto = dto with
+                {
+                    ParityLatest = d.TryGetProperty("f43", out var f43) && f43.ValueKind == System.Text.Json.JsonValueKind.Number
+                        ? f43.GetDouble() / 10000 : 0,
+                    ParityChangePct = d.TryGetProperty("f170", out var f170) && f170.ValueKind == System.Text.Json.JsonValueKind.Number
+                        ? f170.GetDouble() / 100 : 0,
+                };
+            }
+        }
+        catch
+        {
+            // 中间价获取失败不影响汇率主数据
+        }
 
         cache.Set(cacheKey, dto, TimeSpan.FromMinutes(5));
         return Ok(dto);
@@ -351,7 +376,7 @@ public class QuoteController(
         var points = sh.Keys
             .Where(d => sz.ContainsKey(d))
             .OrderBy(d => d)
-            .GroupBy(d => GranularityKey(d, granularity))
+            .GroupBy(d => DateGroupKeys.Key(d, granularity))
             .OrderBy(g => g.Key)
             .Select(g =>
             {
@@ -367,15 +392,6 @@ public class QuoteController(
         if (points.Count > limit) points = points.Skip(points.Count - limit).ToList();
         return new MarketVolumeDto(0, 0, null, points);
     }
-
-    private static string GranularityKey(DateTime date, string granularity) => granularity switch
-    {
-        "week" => date.AddDays(-((int)date.DayOfWeek + 6) % 7).ToString("yyyy-MM-dd"), // 本周一
-        "month" => date.ToString("yyyy-MM"),
-        "quarter" => $"{date:yyyy}-Q{(date.Month - 1) / 3 + 1}",
-        "year" => date.ToString("yyyy"),
-        _ => date.ToString("yyyy-MM-dd"),
-    };
     /// <summary>标的搜索：转发东财搜索接口（代码/拼音/名称），结果自动入库供后续采集使用。</summary>
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] string keyword, [FromQuery] int limit = 20)

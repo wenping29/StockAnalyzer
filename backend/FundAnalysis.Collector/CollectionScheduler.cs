@@ -33,8 +33,11 @@ public class CollectionScheduler(IServiceProvider services, ILogger<CollectionSc
                     using var scope = services.CreateScope();
                     var collector = scope.ServiceProvider.GetRequiredService<CollectorService>();
                     var liquidity = scope.ServiceProvider.GetRequiredService<LiquidityService>();
+                    var fundamentals = scope.ServiceProvider.GetRequiredService<FundamentalService>();
                     await collector.SyncWatchlistDailyAsync();
                     await liquidity.SyncAllAsync();
+                    await collector.SyncIndicesAsync();
+                    await fundamentals.SyncAllAsync();
                     lastDaily = now;
                     logger.LogInformation("每日全量同步完成");
                 }

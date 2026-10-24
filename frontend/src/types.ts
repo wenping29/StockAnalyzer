@@ -234,6 +234,20 @@ export interface BoardStat {
   count: number
 }
 
+// ---------- 自选提醒 ----------
+
+export interface AlertRuleDto {
+  id: number
+  symbol: string
+  name: string | null
+  ruleType: 'PriceAbove' | 'PriceBelow' | 'ChangePctUp' | 'ChangePctDown'
+  threshold: number
+  enabled: boolean
+  createdAt: string
+  lastTriggeredAt: string | null
+  lastTriggeredPrice: number | null
+}
+
 export interface ScreenerQuery {
   keyword?: string
   industry?: string

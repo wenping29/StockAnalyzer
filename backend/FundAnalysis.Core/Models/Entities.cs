@@ -181,3 +181,22 @@ public class StockFundamental
 
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
+
+/// <summary>自选价格提醒规则。</summary>
+public class AlertRule
+{
+    public long Id { get; set; }
+    public string UserId { get; set; } = "";
+    public string Symbol { get; set; } = "";
+
+    /// <summary>规则类型：PriceAbove/PriceBelow（价格上破/下破）、ChangePctUp/ChangePctDown（日涨/跌超阈值%）。</summary>
+    public string RuleType { get; set; } = "PriceAbove";
+    /// <summary>阈值（价格元或百分比）。</summary>
+    public double Threshold { get; set; }
+    public bool Enabled { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+    /// <summary>最近一次触发时间与当时价格（null = 从未触发）。</summary>
+    public DateTime? LastTriggeredAt { get; set; }
+    public double? LastTriggeredPrice { get; set; }
+}

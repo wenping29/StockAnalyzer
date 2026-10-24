@@ -15,6 +15,8 @@
     <!-- 认证与 API 文档（EF 提供程序与 Identity 已移至 FundAnalysis.Core） -->
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
     <PackageReference Include="Hangfire.InMemory" Version="1.0.0" />
+    <PackageReference Include="Hangfire.MySqlStorage" Version="2.0.3" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.13" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
     <!-- 迁移工具（dotnet ef）以 Web 为启动项目时需要 -->

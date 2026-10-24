@@ -6,6 +6,7 @@ using FundAnalysis.Models;
 using FundAnalysis.Services;
 using FundAnalysis.Services.Providers;
 using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -62,13 +63,36 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 
-// ---------- Hangfire（内存存储，Dashboard 在 /hangfire） ----------
-// 说明：定时任务在每次启动时重新注册，内存存储足够；以后上 MySQL 可换持久化存储
-builder.Services.AddHangfire(h => h
-    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-    .UseSimpleAssemblyNameTypeSerializer()
-    .UseRecommendedSerializerSettings()
-    .UseInMemoryStorage());
+// ---------- Hangfire 存储：MySQL 数据库时持久化任务历史，其余（SQLite）用内存存储 ----------
+// 说明：定时任务每次启动都会重新注册，内存存储开发可用；生产（MySQL）自动持久化
+builder.Services.AddHangfire(h =>
+{
+    h.SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+     .UseSimpleAssemblyNameTypeSerializer()
+     .UseRecommendedSerializerSettings();
+
+    var dbProvider = (config["Database:Provider"] ?? "sqlite").Trim().ToLowerInvariant();
+    switch (dbProvider)
+    {
+        case "mysql":
+            h.UseStorage(new Hangfire.MySql.MySqlStorage(
+                config.GetConnectionString("Default"),
+                new Hangfire.MySql.MySqlStorageOptions
+                {
+                    // 生产建议：放宽轮询间隔，降低 MySQL 压力
+                    QueuePollInterval = TimeSpan.FromSeconds(15),
+                    JobExpirationCheckInterval = TimeSpan.FromHours(1),
+                }));
+            break;
+        case "postgresql":
+        case "npgsql":
+            h.UsePostgreSqlStorage(config.GetConnectionString("Default"));
+            break;
+        default:
+            h.UseInMemoryStorage();
+            break;
+    }
+});
 builder.Services.AddHangfireServer();
 
 // ---------- 业务服务 ----------
@@ -88,6 +112,7 @@ builder.Services.AddScoped<AnalysisService>();
 builder.Services.AddScoped<LiquidityService>();
 builder.Services.AddScoped<HsgtService>();
 builder.Services.AddScoped<FundamentalService>();
+builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<TokenService>();
 
 // ---------- Swagger + CORS ----------

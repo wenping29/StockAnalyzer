@@ -61,7 +61,7 @@ public record MarketVolumeDto(
     double? ChangePct,
     List<MarketVolumePointDto> Points);
 
-/// <summary>人民币汇率（离岸 USDCNH）。数值上升 = 人民币贬值。</summary>
+/// <summary>人民币汇率（离岸 USDCNH）。数值上升 = 人民币贬值。Parity 为央行中间价（实时值）。</summary>
 public record FxPointDto(string Date, double Rate);
 
 public record FxRateDto(
@@ -69,7 +69,9 @@ public record FxRateDto(
     string LatestDate,
     double DayChangePct,
     double? MonthChangePct,
-    List<FxPointDto> Points);
+    List<FxPointDto> Points,
+    double ParityLatest,
+    double ParityChangePct);
 
 /// <summary>十年期美债收益率（%）。DayChangeBp：较上日变动（基点）。</summary>
 public record Us10yDto(

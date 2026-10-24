@@ -99,8 +99,8 @@ public class CollectorService(AppDbContext db, IQuoteProvider provider, IConfigu
                     throw new InvalidOperationException("连续 3 个指数同步失败，疑似触发东财 IP 频率风控，中止本轮同步");
             }
 
-            // 低频请求防止触发东财 IP 风控
-            await Task.Delay(2000);
+            // 低频请求防止触发东财 IP 风控（长惩罚刚解除时 2 秒间隔仍会再次触发，放宽到 6 秒）
+            await Task.Delay(6000);
         }
     }
 

@@ -18,6 +18,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<LprRate> LprRates => Set<LprRate>();
     public DbSet<IndexDaily> IndexDailies => Set<IndexDaily>();
     public DbSet<StockFundamental> StockFundamentals => Set<StockFundamental>();
+    public DbSet<AlertRule> AlertRules => Set<AlertRule>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -99,6 +100,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         {
             e.HasIndex(x => x.Symbol).IsUnique();
             e.HasIndex(x => x.Industry);
+        });
+
+        b.Entity<AlertRule>(e =>
+        {
+            e.HasIndex(x => x.UserId);
+            e.HasIndex(x => new { x.UserId, x.Symbol });
         });
     }
 }
