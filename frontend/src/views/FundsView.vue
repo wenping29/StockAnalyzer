@@ -25,6 +25,8 @@ const filters = reactive({ keyword: '', fundType: '' })
 
 // 自选状态（背景色 + 按钮状态）
 const watchSymbols = ref<Set<string>>(new Set())
+// 点击行：右侧面板显示基金信息（跳转用"详情"按钮）
+const detailRow = ref<any>(null)
 
 async function loadWatchlist() {
   try {
@@ -118,47 +120,73 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="page-card">
-      <el-table :data="funds" v-loading="loading" :row-class-name="rowClass" row-class-name="row-click"
-        @row-click="(r: any) => router.push(`/analysis/${r.symbol}`)">
-        <el-table-column label="代码" width="110">
-          <template #default="{ row }">{{ displayCode(row.symbol) }}</template>
-        </el-table-column>
-        <el-table-column label="名称" min-width="200">
-          <template #default="{ row }">
-            {{ row.name }}
-            <el-tag v-if="row.fundType" size="small" type="info">{{ row.fundType }}</el-tag>
+    <!-- 基金列表（左）+ 选中基金信息面板（右） -->
+    <div class="list-layout">
+      <div class="page-card table-card">
+        <el-table :data="funds" v-loading="loading" :row-class-name="rowClass"
+          @row-click="(r: any) => detailRow = r">
+          <el-table-column label="操作" width="150" align="center">
+            <template #default="{ row }">
+              <el-button link size="small" type="primary" :disabled="watchSymbols.has(row.symbol)"
+                @click.stop="addSelf(row)">{{ watchSymbols.has(row.symbol) ? '✓自选' : '＋自选' }}</el-button>
+              <el-button link size="small" type="success"
+                @click.stop="router.push(`/analysis/${row.symbol}`)">详情</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column label="代码" width="100">
+            <template #default="{ row }">{{ displayCode(row.symbol) }}</template>
+          </el-table-column>
+          <el-table-column label="名称" min-width="200">
+            <template #default="{ row }">
+              {{ row.name }}
+              <el-tag v-if="row.fundType" size="small" type="info">{{ row.fundType }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="最新净值" width="110" align="right">
+            <template #default="{ row }">{{ row.nav == null ? '未采集' : row.nav.toFixed(4) }}</template>
+          </el-table-column>
+          <el-table-column label="日涨幅" width="95" align="right">
+            <template #default="{ row }">
+              <span :class="pctClass(row.navChgPct)">{{ fmtPct(row.navChgPct) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="净值日期" width="120" align="right">
+            <template #default="{ row }">{{ row.navDate ? row.navDate.slice(0, 10) : '—' }}</template>
+          </el-table-column>
+          <template #empty>
+            <el-empty description="无符合条件的基金" :image-size="60" />
           </template>
-        </el-table-column>
-        <el-table-column label="最新净值" width="110" align="right">
-          <template #default="{ row }">{{ row.nav == null ? '未采集' : row.nav.toFixed(4) }}</template>
-        </el-table-column>
-        <el-table-column label="日涨幅" width="95" align="right">
-          <template #default="{ row }">
-            <span :class="pctClass(row.navChgPct)">{{ fmtPct(row.navChgPct) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="净值日期" width="120" align="right">
-          <template #default="{ row }">{{ row.navDate ? row.navDate.slice(0, 10) : '—' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="100" align="center">
-          <template #default="{ row }">
-            <el-button link size="small" type="primary" :disabled="watchSymbols.has(row.symbol)"
-              @click.stop="addSelf(row)">{{ watchSymbols.has(row.symbol) ? '✓自选' : '＋自选' }}</el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <el-empty description="无符合条件的基金" :image-size="60" />
-        </template>
-      </el-table>
+        </el-table>
 
-      <div class="pager">
-        <el-pagination
-          v-model:current-page="page"
-          :page-size="pageSize"
-          :total="total"
-          layout="prev, pager, next, total"
-          @current-change="load" />
+        <div class="pager">
+          <el-pagination
+            v-model:current-page="page"
+            :page-size="pageSize"
+            :total="total"
+            layout="prev, pager, next, total"
+            @current-change="load" />
+        </div>
+      </div>
+
+      <!-- 右侧：选中基金信息面板 -->
+      <div class="page-card detail-panel" v-if="detailRow">
+        <div class="dp-head">
+          <div class="dp-name">{{ detailRow.name }}</div>
+          <div class="dp-code">{{ displayCode(detailRow.symbol) }}</div>
+        </div>
+        <div class="dp-price-row">
+          <span class="dp-price" :class="pctClass(detailRow.navChgPct)">
+            {{ detailRow.nav == null ? '未采集' : detailRow.nav.toFixed(4) }}
+          </span>
+          <span class="dp-chg" :class="pctClass(detailRow.navChgPct)">{{ fmtPct(detailRow.navChgPct) }}</span>
+        </div>
+        <div class="dp-grid">
+          <div class="dp-item"><span class="k">基金类型</span><span class="v">{{ detailRow.fundType ?? '—' }}</span></div>
+          <div class="dp-item"><span class="k">净值日期</span><span class="v">{{ detailRow.navDate ? detailRow.navDate.slice(0, 10) : '—' }}</span></div>
+        </div>
+        <el-button type="primary" style="width: 100%; margin-top: 14px"
+          @click="router.push(`/analysis/${detailRow.symbol}`)">进入净值走势分析 →</el-button>
+        <div class="dp-tip">加入自选后自动采集历史净值</div>
       </div>
     </div>
   </div>
@@ -168,6 +196,31 @@ onMounted(async () => {
 .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .dim { color: #c0c4cc; font-size: 12px; }
 .pager { display: flex; justify-content: flex-end; margin-top: 12px; }
+/* 左列表 + 右信息面板 */
+.list-layout { display: flex; gap: 16px; align-items: flex-start; }
+.table-card { flex: 1; min-width: 0; }
+.detail-panel {
+  width: 280px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 12px;
+}
+.dp-head { margin-bottom: 8px; }
+.dp-name { font-size: 17px; font-weight: 600; }
+.dp-code { color: #909399; font-size: 12px; margin-top: 2px; }
+.dp-price-row { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 12px; }
+.dp-price { font-size: 26px; font-weight: 700; }
+.dp-chg { font-size: 14px; font-weight: 600; }
+.dp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.dp-item { display: flex; flex-direction: column; padding: 6px 8px; background: #f8f9fb; border-radius: 6px; }
+.dp-item .k { font-size: 11px; color: #909399; }
+.dp-item .v { font-size: 14px; font-weight: 600; margin-top: 2px; }
+.dp-tip { color: #c0c4cc; font-size: 11px; margin-top: 10px; text-align: center; }
+
+@media (max-width: 1100px) {
+  .list-layout { flex-direction: column; }
+  .detail-panel { width: 100%; position: static; }
+}
 /* 已加入自选的行：淡绿背景 */
 :deep(tr.in-watchlist > td.el-table__cell) { background: #f0f9eb; }
 :deep(tr.in-watchlist:hover > td.el-table__cell) { background: #e1f3d8; }

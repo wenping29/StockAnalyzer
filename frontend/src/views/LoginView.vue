@@ -76,11 +76,14 @@ async function submit() {
   background: linear-gradient(135deg, #1f2d3d 0%, #2d3a4b 100%);
 }
 .login-box {
-  width: 400px;
+  width: min(400px, 92vw);
   background: #fff;
   border-radius: 10px;
   padding: 32px 36px 24px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+@media (max-width: 420px) {
+  .login-box { padding: 24px 20px 18px; }
 }
 .login-box h2 { text-align: center; margin-bottom: 6px; font-size: 20px; }
 .tip { text-align: center; color: #909399; font-size: 12px; margin-bottom: 18px; }
