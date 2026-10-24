@@ -1,3 +1,4 @@
+using System.Net;
 using FundAnalysis.Collector;
 using FundAnalysis.Data;
 using FundAnalysis.Services;
@@ -10,7 +11,16 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Configuration.AddCommandLine(args);
 
 builder.Services.AddDbContext<AppDbContext>(opt => opt.UseDatabase(builder.Configuration));
-builder.Services.AddHttpClient("eastmoney");
+builder.Services.AddHttpClient("eastmoney", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        AutomaticDecompression = DecompressionMethods.All,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+        MaxConnectionsPerServer = 32,
+    });
 builder.Services.AddScoped<IQuoteProvider, EastmoneyProvider>();
 builder.Services.AddScoped<CollectorService>();
 builder.Services.AddScoped<LiquidityService>();

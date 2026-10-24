@@ -1,6 +1,7 @@
 using FundAnalysis.Models;
 using FundAnalysis.Services;
 using FundAnalysis.Services.Providers;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,8 +13,27 @@ namespace FundAnalysis.Controllers;
 [ApiController]
 [Route("api/quote")]
 public class QuoteController(
-    AppDbContext db, AnalysisService analysis, IQuoteProvider provider, IMemoryCache cache, HsgtService hsgt) : ControllerBase
+    AppDbContext db, AnalysisService analysis, IQuoteProvider provider, IMemoryCache cache, HsgtService hsgt,
+    ILogger<QuoteController> logger) : ControllerBase
 {
+    /// <summary>
+    /// 安全拉取东财 K 线：上游（push2his.eastmoney.com）不可达时返回空列表并写告警日志，
+    /// 避免单个外部接口故障导致整个行情接口 500。调用方应以"空列表 = 暂无可展示数据"处理。
+    /// </summary>
+    private async Task<List<KLineItem>> FetchKLineSafeAsync(string symbol, int secMarket, int klt, int limit, int fqt = 1)
+    {
+        try
+        {
+            return await provider.FetchKLineAsync(symbol, secMarket, klt, limit, fqt);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "东财 K 线拉取失败（上游 push2his 不可达？）：secid={SecMarket}.{Symbol} klt={Klt}",
+                secMarket, symbol, klt);
+            return new List<KLineItem>();
+        }
+    }
+
     /// <summary>
     /// 人民币汇率趋势（离岸 USDCNH，东财 secid 133）。数值上升 = 人民币贬值，下降 = 升值。
     /// </summary>
@@ -26,7 +46,7 @@ public class QuoteController(
         if (cache.TryGetValue(cacheKey, out FxRateDto? cached) && cached is not null)
             return Ok(cached);
 
-        var bars = await provider.FetchKLineAsync("USDCNH", 133, 101, days);
+        var bars = await FetchKLineSafeAsync("USDCNH", 133, 101, days);
         if (bars.Count == 0)
             return Ok(new FxRateDto(0, "-", 0, null, [], 0, 0));
 
@@ -82,7 +102,7 @@ public class QuoteController(
         if (cache.TryGetValue(cacheKey, out Us10yDto? cached) && cached is not null)
             return Ok(cached);
 
-        var bars = await provider.FetchKLineAsync("US10Y", 171, 101, days, fqt: 0);
+        var bars = await FetchKLineSafeAsync("US10Y", 171, 101, days, fqt: 0);
         if (bars.Count == 0)
             return Ok(new Us10yDto(0, "-", 0, null, []));
 
@@ -117,9 +137,9 @@ public class QuoteController(
             return Ok(cached);
 
         // 三条期限并行拉取
-        var y5 = await provider.FetchKLineAsync("CN5Y", 171, 101, days, fqt: 0);
-        var y10 = await provider.FetchKLineAsync("CN10Y", 171, 101, days, fqt: 0);
-        var y30 = await provider.FetchKLineAsync("CN30Y", 171, 101, days, fqt: 0);
+        var y5 = await FetchKLineSafeAsync("CN5Y", 171, 101, days, fqt: 0);
+        var y10 = await FetchKLineSafeAsync("CN10Y", 171, 101, days, fqt: 0);
+        var y30 = await FetchKLineSafeAsync("CN30Y", 171, 101, days, fqt: 0);
         if (y10.Count == 0)
             return Ok(new CnBondDto(0, "-", 0, null, []));
 

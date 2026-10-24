@@ -20,4 +20,4 @@ frontend/dist/
 */bin/*
 */obj/*
 
-publish/*
+publish/

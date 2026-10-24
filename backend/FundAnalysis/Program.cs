@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Text.Encodings.Web;
 using FundAnalysis.Data;
@@ -108,7 +109,16 @@ builder.Services.AddHangfire(h =>
 builder.Services.AddHangfireServer();
 
 // ---------- 业务服务 ----------
-builder.Services.AddHttpClient("eastmoney");
+builder.Services.AddHttpClient("eastmoney", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        AutomaticDecompression = DecompressionMethods.All,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+        MaxConnectionsPerServer = 32,
+    });
 builder.Services.AddHttpClient("tushare");
 builder.Services.AddScoped<EastmoneyProvider>();
 builder.Services.AddScoped<TushareProvider>();

@@ -20,8 +20,8 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
     {
         var client = factory.CreateClient("eastmoney");
         client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
-        // 东财 push2 对 keep-alive 连接复用支持差，用短连接避免中途断连
-        client.DefaultRequestHeaders.Connection.Add("close");
+        // 东财 push2 / push2his 接口必须带 Referer，否则服务端会在响应中途 RST 连接（ResponseEnded）
+        client.DefaultRequestHeaders.Referrer = new Uri("https://quote.eastmoney.com/");
         return client;
     }
 
@@ -218,9 +218,10 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
         return list;
     }
 
-    /// <summary>带重试的 GET：连续快速请求容易触发东财服务端断连，重试 5 次、每页间隔 400ms。</summary>
+    /// <summary>带重试的 GET：连续快速请求容易触发东财服务端断连（ResponseEnded），对瞬时网络错误重试 5 次、每次间隔递增。取消信号不重试，立即上抛。</summary>
     private static async Task<string> GetWithRetryAsync(HttpClient client, string url, CancellationToken ct)
     {
+        const int maxAttempts = 5;
         for (var attempt = 1; ; attempt++)
         {
             try
@@ -229,7 +230,11 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
                 await Task.Delay(400, ct);
                 return body;
             }
-            catch (Exception) when (attempt < 5)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception) when (attempt < maxAttempts)
             {
                 await Task.Delay(1000 * attempt, ct);
             }
