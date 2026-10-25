@@ -1,43 +1,53 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type {
-  LiquidityOverview, ShiborData, MoneySupplyData, ReserveRatioData, LprData,
+  LiquidityOverview, ShiborData, MoneySupplyData, ReserveRatioData, LprData, OmoItem,
 } from '../types'
 import {
   fetchLiquidityOverview, fetchShibor, fetchMoneySupply, fetchReserveRatios,
-  fetchLpr,
+  fetchLpr, fetchOmo,
 } from '../api/liquidity'
 import RefreshButton from '../components/RefreshButton.vue'
 import MultiLineChart from '../components/MultiLineChart.vue'
+import OmoGanttChart from '../components/OmoGanttChart.vue'
 
 const overview = ref<LiquidityOverview | null>(null)
 const shibor = ref<ShiborData | null>(null)
 const supply = ref<MoneySupplyData | null>(null)
 const reserve = ref<ReserveRatioData | null>(null)
 const lpr = ref<LprData | null>(null)
+const omo = ref<OmoItem[]>([])
 const loading = ref(false)
 const shiborDays = ref(90)
+const omoDays = ref(90)
 
 const supplyView = ref<'yoy' | 'amount'>('yoy')
 
 async function load() {
   loading.value = true
   try {
-    const [ov, sb, sp, rr, lp] = await Promise.all([
+    const [ov, sb, sp, rr, lp, om] = await Promise.all([
       fetchLiquidityOverview(),
       fetchShibor(shiborDays.value),
       fetchMoneySupply(24),
       fetchReserveRatios(),
       fetchLpr(),
+      fetchOmo(omoDays.value).catch(() => null),
     ])
     overview.value = ov
     shibor.value = sb
     supply.value = sp
     reserve.value = rr
     lpr.value = lp
+    omo.value = om?.items ?? []
   } finally {
     loading.value = false
   }
+}
+
+async function reloadOmo() {
+  const om = await fetchOmo(omoDays.value).catch(() => null)
+  omo.value = om?.items ?? []
 }
 
 async function reloadShibor() {
@@ -87,6 +97,30 @@ const reserveSeries = computed(() => [
 // 存准率最近调整记录（倒序 6 条）
 const reserveRecentChanges = computed(() =>
   [...(reserve.value?.items ?? [])].reverse().slice(0, 6))
+
+// 央行逆回购到期统计（甘特图上方摘要）
+function localDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function addDays(d: Date, n: number) {
+  const r = new Date(d)
+  r.setDate(r.getDate() + n)
+  return r
+}
+const todayStr = localDate(new Date())
+const omoSummary = computed(() => {
+  const live = omo.value.filter((i) => i.maturityDate >= todayStr)
+  const sum = (list: OmoItem[]) => list.reduce((s, i) => s + i.amount, 0)
+  const between = (from: Date, to: Date) =>
+    live.filter((i) => i.maturityDate >= localDate(from) && i.maturityDate < localDate(to))
+  const now = new Date()
+  return {
+    live: sum(live),
+    week: sum(between(now, addDays(now, 7))),
+    nextWeek: sum(between(addDays(now, 7), addDays(now, 14))),
+    month: sum(between(now, addDays(now, 30))),
+  }
+})
 
 function pctClass(v: number) {
   return v >= 0 ? 'up' : 'down'
@@ -138,6 +172,26 @@ onMounted(load)
         <div class="value">{{ overview.reserveLarge.toFixed(1) }}%<span class="unit"> / {{ overview.reserveSmall.toFixed(1) }}%</span></div>
         <div class="sub">大型 / 中小型机构（现行）</div>
       </div>
+    </div>
+
+    <!-- 央行逆回购投放与到期 -->
+    <div class="page-card">
+      <div class="chart-toolbar">
+        <span class="chart-title">央行逆回购投放与到期 —— 柱高=投放量（亿元），柱宽=存续期（操作日 → 到期日），蓝虚线右侧为尚未到期</span>
+        <div style="flex: 1" />
+        <el-radio-group v-model="omoDays" size="small" @change="reloadOmo">
+          <el-radio-button :value="30">近1月</el-radio-button>
+          <el-radio-button :value="90">近3月</el-radio-button>
+          <el-radio-button :value="180">近半年</el-radio-button>
+        </el-radio-group>
+      </div>
+      <div class="omo-summary" v-if="omo.length">
+        <span>未到期存续 <b>{{ omoSummary.live.toLocaleString() }}</b> 亿</span>
+        <span>本周到期 <b>{{ omoSummary.week.toLocaleString() }}</b> 亿</span>
+        <span>下周到期 <b>{{ omoSummary.nextWeek.toLocaleString() }}</b> 亿</span>
+        <span>未来30天到期 <b>{{ omoSummary.month.toLocaleString() }}</b> 亿</span>
+      </div>
+      <OmoGanttChart :items="omo" />
     </div>
 
     <!-- Shibor 走势 -->
@@ -214,6 +268,8 @@ onMounted(load)
 .unit { font-size: 13px; color: #909399; margin-left: 2px; }
 .chart-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .chart-title { color: #606266; font-size: 13px; }
+.omo-summary { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 8px; color: #909399; font-size: 13px; }
+.omo-summary b { color: #303133; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 1100px) { .two-col { grid-template-columns: 1fr; } }
 </style>

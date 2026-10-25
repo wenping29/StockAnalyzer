@@ -99,7 +99,8 @@ function render() {
 }
 
 onMounted(() => {
-  chart = echarts.init(el.value!)
+  if (!el.value) return
+  chart = echarts.init(el.value)
   render()
   window.addEventListener('resize', resize)
 })
@@ -117,10 +118,22 @@ watch(() => props.items, render, { deep: true })
 </script>
 
 <template>
-  <div v-if="items.length" ref="el" style="width: 100%; height: 360px" />
-  <div v-else class="empty-hint">暂无数据：点击右上角"同步最新数据"拉取央行公告（首次约需 3~5 分钟）</div>
+  <div style="position: relative">
+    <div ref="el" style="width: 100%; height: 360px" />
+    <div v-if="!items.length" class="empty-hint">
+      暂无数据：点击右上角"同步最新数据"拉取央行公告（首次约需 3~5 分钟）
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.empty-hint { color: #c0c4cc; font-size: 13px; text-align: center; padding: 60px 0; }
+.empty-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c0c4cc;
+  font-size: 13px;
+}
 </style>

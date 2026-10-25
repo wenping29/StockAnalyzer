@@ -174,7 +174,6 @@ public class LiquidityService(AppDbContext db, IHttpClientFactory factory, ILogg
     private static readonly Regex PbocInlineOp = new(
         "开展了\\s*(?<amt>[\\d,]+(?:\\.\\d+)?)\\s*亿元(?<term>\\s*隔夜|\\s*\\d+\\s*天期?|\\s*\\d+\\s*个?月)?\\s*逆回购操作",
         RegexOptions.Compiled);
-    private static readonly Regex PbocTermMonth = new("(?<n>\\d+)\\s*个月", RegexOptions.Compiled);
 
     /// <summary>
     /// 同步央行公开市场逆回购操作公告。列表按日期倒序增量抓取（比库内最新更早即停），
@@ -301,25 +300,26 @@ public class LiquidityService(AppDbContext db, IHttpClientFactory factory, ILogg
             Add(n + (months ? "个月" : "天"), months ? n * 30 : n, Num(m.Groups["awd"].Value), rate);
         }
 
-        // 内联带期限的操作（隔夜等，通常无对应表格行）
+        // 内联带期限的操作（隔夜等，通常无对应表格行）。期限以"期"结尾时先剥掉再判类型
         foreach (Match m in PbocInlineOp.Matches(text))
         {
-            var termStr = m.Groups["term"].Value.Trim();
+            var termStr = m.Groups["term"].Value.Trim().TrimEnd('期');
             if (termStr.Length == 0) continue; // 无期限的旧版表述，期限已在表格行
             var amount = Num(m.Groups["amt"].Value);
             if (amount <= 0) continue;
+
+            var nMatch = Regex.Match(termStr, "\\d+");
             if (termStr == "隔夜") Add("隔夜", 1, amount, null);
-            else if (termStr.EndsWith("天"))
-            {
-                var n = int.Parse(termStr.TrimEnd('天', '期'));
-                Add(n + "天", n, amount, null);
-            }
-            else
-            {
-                var n = int.Parse(PbocTermMonth.Match(termStr).Groups["n"].Value);
-                Add(n + "个月", n * 30, amount, null);
-            }
+            else if (!nMatch.Success) continue;
+            else if (termStr.Contains("个月"))
+                Add(nMatch.Value + "个月", int.Parse(nMatch.Value) * 30, amount, null);
+            else if (termStr.Contains("天"))
+                Add(nMatch.Value + "天", int.Parse(nMatch.Value), amount, null);
         }
+
+        // 未解析出任何操作也要留痕（0 量墓碑行），否则增量游标会卡在该公告日反复重抓
+        if (ops.Count == 0)
+            ops.Add(new OmoOperation { Date = date, Term = "未解析", TermDays = 0, Amount = 0 });
         return ops;
     }
 
