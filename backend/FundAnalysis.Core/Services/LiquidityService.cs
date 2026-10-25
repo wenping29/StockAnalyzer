@@ -172,7 +172,7 @@ public class LiquidityService(AppDbContext db, IHttpClientFactory factory, ILogg
         RegexOptions.Compiled);
     // 正文内联操作："开展了2580亿元隔夜逆回购操作" / "开展了3543亿元逆回购操作"（无期限，期限看表格）
     private static readonly Regex PbocInlineOp = new(
-        "开展了\\s*(?<amt>[\\d,]+(?:\\.\\d+)?)\\s*亿元(?<term>\\s*隔夜|\\s*\\d+\\s*天期?|\\s*\\d+\\s*个?月)?\\s*逆回购操作",
+        "开展了\\s*(?<amt>[\\d,]+(?:\\.\\d+)?)\\s*亿元(?<term>\\s*隔夜|\\s*\\d+\\s*天期?|\\s*\\d+\\s*个?月期?)?\\s*逆回购操作",
         RegexOptions.Compiled);
 
     /// <summary>
@@ -274,7 +274,7 @@ public class LiquidityService(AppDbContext db, IHttpClientFactory factory, ILogg
     }
 
     /// <summary>解析公告正文为操作列表。到期日由调用方统一按交易日历顺延。</summary>
-    private static List<OmoOperation> ParseOmoAnnouncement(string text)
+    internal static List<OmoOperation> ParseOmoAnnouncement(string text)
     {
         var dateMatch = PbocCnDate.Match(text);
         if (!dateMatch.Success) return [];

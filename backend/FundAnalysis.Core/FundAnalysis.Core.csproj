@@ -13,6 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="FundAnalysis.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Web SDK 的 ImplicitUsings 自带以下命名空间，classlib 需显式声明以保持源码不变 -->
     <Using Include="Microsoft.Extensions.Configuration" />
     <Using Include="Microsoft.Extensions.DependencyInjection" />

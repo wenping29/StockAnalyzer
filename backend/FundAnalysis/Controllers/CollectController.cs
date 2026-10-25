@@ -19,8 +19,11 @@ namespace FundAnalysis.Controllers;
 [Authorize]
 public class CollectController(
     IBackgroundJobClient backgroundJobs,
-    IMonitoringApi monitoringApi) : ControllerBase
+    JobStorage jobStorage) : ControllerBase
 {
+    // IMonitoringApi 不在 DI 中注册，须从 JobStorage 取（AddHangfire 只注册 JobStorage 本身）
+    private IMonitoringApi MonitoringApi => jobStorage.GetMonitoringApi();
+
     /// <summary>触发某分类采集，返回 Hangfire 作业 ID 供前端轮询状态。</summary>
     /// <remarks>
     /// 分类：indices(指数日K) / indicators(汇率·美债·中债) / intraday(指数日内分时) /
@@ -54,7 +57,7 @@ public class CollectController(
     [HttpGet("status/{jobId}")]
     public IActionResult Status(string jobId)
     {
-        var job = monitoringApi.JobDetails(jobId);
+        var job = MonitoringApi.JobDetails(jobId);
         if (job is null) return NotFound(new { message = "作业不存在或已过期" });
 
         // History 最新一条即当前状态；CreatedAt 为作业创建（入队）时间
