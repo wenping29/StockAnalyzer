@@ -244,7 +244,11 @@ public class LiquidityService(AppDbContext db, IHttpClientFactory factory, ILogg
                     await Task.Delay(1200); // 央行站点低频抓取
                 }
 
-                if (reachedStored) return;
+                if (reachedStored)
+                {
+                    logger.LogInformation("央行逆回购同步完成（已追平库内最新 {Date:yyyy-MM-dd}），新增 {Count} 条", latestDate, added);
+                    return;
+                }
                 nextUrl = PbocNextPage.Match(html) is { Success: true } np
                     ? "https://www.pbc.gov.cn" + np.Groups["path"].Value
                     : null;
