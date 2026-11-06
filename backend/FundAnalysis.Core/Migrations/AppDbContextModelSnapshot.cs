@@ -133,6 +133,59 @@ namespace FundAnalysis.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("FundAnalysis.Models.FundHolding", b =>
+                {
+                    b.Property<string>("FundCode")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<int>("Rank")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ReportDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("SecMarket")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StockName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("StockSymbol")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<double>("WeightPct")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("FundCode", "Rank");
+
+                    b.ToTable("FundHoldings");
+                });
+
+            modelBuilder.Entity("FundAnalysis.Models.FundHoldingSync", b =>
+                {
+                    b.Property<string>("FundCode")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<DateTime>("FetchedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("HoldingCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ReportDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("FundCode");
+
+                    b.ToTable("FundHoldingSyncs");
+                });
+
             modelBuilder.Entity("FundAnalysis.Models.FundNav", b =>
                 {
                     b.Property<long>("Id")

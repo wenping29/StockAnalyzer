@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="资金流分析系统">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f4257"/>
+      <stop offset="1" stop-color="#16212e"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#2f80ed"/>
+      <stop offset="1" stop-color="#7fc4ff"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.6" markerHeight="4.6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#ff4d4f"/>
+    </marker>
+  </defs>
+
+  <rect width="64" height="64" rx="14" fill="url(#tile)"/>
+
+  <!-- 三根递增柱：资金流入 -->
+  <rect x="12.5" y="37" width="9" height="15" rx="2.5" fill="url(#bar)"/>
+  <rect x="25.5" y="31" width="9" height="21" rx="2.5" fill="url(#bar)"/>
+  <rect x="38.5" y="24" width="9" height="28" rx="2.5" fill="url(#bar)"/>
+
+  <!-- 上升趋势线 -->
+  <path d="M11 43.5 L24.5 34.5 L36 27.5 L48.5 15" fill="none"
+        stroke="#ff4d4f" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"
+        marker-end="url(#arrow)"/>
+</svg>

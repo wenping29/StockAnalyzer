@@ -135,6 +135,7 @@ builder.Services.AddScoped<LiquidityService>();
 builder.Services.AddScoped<HsgtService>();
 builder.Services.AddScoped<FundamentalService>();
 builder.Services.AddScoped<FundService>();
+builder.Services.AddScoped<FundEstimateService>();
 builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<TokenService>();
 

@@ -79,6 +79,30 @@ export interface WatchlistItem {
   mainNetIn5d: number | null
 }
 
+// ---------- 基金重仓股估算 ----------
+
+export interface FundHoldingItem {
+  symbol: string
+  name: string
+  secMarket: number
+  weightPct: number
+  price: number | null
+  changePct: number | null
+}
+
+/** 基金当日涨跌估算：按最新季报前十大重仓股实时涨跌幅加权。 */
+export interface FundEstimate {
+  symbol: string
+  name: string
+  estimatedChangePct: number | null
+  /** 参与计算的持仓占净值比例（%），未覆盖部分不计入估算。 */
+  coveredWeightPct: number
+  reportDate: string | null
+  holdings: FundHoldingItem[]
+  /** 本次估算实际使用的行情源：东财 / 腾讯备用 / 均不可用。 */
+  quoteSource: 'Eastmoney' | 'Tencent' | 'None'
+}
+
 export interface AdminUser {
   id: string
   userName: string

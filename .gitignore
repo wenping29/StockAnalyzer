@@ -10,6 +10,8 @@ obj/
 node_modules/
 frontend/dist/
 
+deploy/dist/
+
 # IDE
 .vs/
 .idea/

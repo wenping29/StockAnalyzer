@@ -40,6 +40,26 @@ public record WatchlistItemDto(
     string Symbol, string Name, string Type,
     double? LatestPrice, double? ChangePct, double? MonthReturnPct, double? MainNetIn5d);
 
+// ---------- 基金重仓股估算 ----------
+
+public record FundHoldingItemDto(
+    string Symbol, string Name, int SecMarket,
+    double WeightPct, double? Price, double? ChangePct);
+
+/// <summary>
+/// 基金当日涨跌估算：按最新季报前十大重仓股的实时涨跌幅、以占净值比例加权。
+/// 公募基金只按季披露前十大重仓，CoveredWeightPct 为参与计算的持仓占净值比例
+/// （估算已按该覆盖权重归一，未披露部分不计入）。
+/// QuoteSource 为本次实际使用的行情源：Eastmoney / Tencent（备用）/ None（均不可用）。
+/// </summary>
+public record FundEstimateDto(
+    string Symbol, string Name,
+    double? EstimatedChangePct,
+    double CoveredWeightPct,
+    DateTime? ReportDate,
+    List<FundHoldingItemDto> Holdings,
+    string QuoteSource);
+
 // ---------- 管理后台相关 ----------
 
 public record AdminUserDto(string Id, string UserName, string? Email, string Role, bool Enabled, DateTime CreatedAt);

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import type { KLinePoint, PerformanceData, MoneyFlowData } from '../types'
+import type { KLinePoint, PerformanceData, MoneyFlowData, FundEstimate } from '../types'
 import { fetchKLine, fetchPerformance, fetchMoneyFlow } from '../api/quote'
+import { fetchFundEstimates } from '../api/funds'
 import { useAuthStore } from '../stores/auth'
 import KLineChart from '../components/KLineChart.vue'
 import TrendChart from '../components/TrendChart.vue'
@@ -19,6 +20,9 @@ const flow = ref<MoneyFlowData | null>(null)
 const loading = ref(false)
 const flowDays = ref(20)
 const flowDenied = ref(false)
+// 场外基金当日重仓股估算
+const estimate = ref<FundEstimate | null>(null)
+let estimateTimer: ReturnType<typeof setInterval> | undefined
 
 const period = ref<'hour' | 'day' | 'week' | 'month'>('day')
 
@@ -66,6 +70,21 @@ async function loadFlow() {
   }
 }
 
+/** 基金当日涨跌估算：按最新季报前十大重仓股加权（重仓股服务端缓存，仅行情实时取）。 */
+async function loadEstimate() {
+  if (!isFund.value) return
+  try {
+    const [e] = await fetchFundEstimates([props.symbol])
+    estimate.value = e ?? null
+  } catch {
+    estimate.value = null
+  }
+}
+
+function reportDateText(d: string | null) {
+  return d ? d.slice(0, 10) : '—'
+}
+
 function pickPeriod(p: 'hour' | 'day' | 'week' | 'month') {
   if (p === 'hour' && !auth.isVip) {
     ElMessage.warning('小时线为 VIP 功能，请联系管理员升级角色')
@@ -91,6 +110,15 @@ onMounted(async () => {
     return
   }
   await Promise.all([loadKLine(), loadFlow()])
+  if (isFund.value) {
+    loadEstimate()
+    // 盘中每分钟刷新一次估算
+    estimateTimer = setInterval(loadEstimate, 60_000)
+  }
+})
+
+onUnmounted(() => {
+  if (estimateTimer) clearInterval(estimateTimer)
 })
 
 watch(flowDays, loadFlow)
@@ -105,6 +133,45 @@ watch(flowDays, loadFlow)
         <h3>{{ perf.name }} <span class="code">{{ perf.symbol }}</span></h3>
         <el-tag>{{ typeLabel }}</el-tag>
         <span class="latest">最新：{{ perf.latestPrice }}（{{ perf.latestDate }}）</span>
+      </div>
+    </div>
+
+    <!-- 场外基金：今日重仓股估算（按季报前十大重仓股实时涨跌加权） -->
+    <div class="page-card" v-if="isFund && estimate" style="margin-bottom: 16px">
+      <div class="chart-toolbar">
+        <span class="chart-title">今日重仓股估算</span>
+        <span class="est-meta">
+          按最新季报前十大重仓股加权 · 覆盖净值 {{ estimate.coveredWeightPct.toFixed(2) }}% ·
+          报告期 {{ reportDateText(estimate.reportDate) }}
+        </span>
+        <div style="flex: 1" />
+        <span class="est-big" :class="pctClass(estimate.estimatedChangePct)">
+          {{ fmtPct(estimate.estimatedChangePct) }}
+        </span>
+      </div>
+
+      <el-table v-if="estimate.holdings.length" :data="estimate.holdings" size="small" stripe>
+        <el-table-column label="股票" min-width="140">
+          <template #default="{ row }">
+            {{ row.name }} <span class="hold-code">{{ row.symbol }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="占净值比例" width="120" align="right">
+          <template #default="{ row }">{{ row.weightPct.toFixed(2) }}%</template>
+        </el-table-column>
+        <el-table-column label="最新价" width="110" align="right">
+          <template #default="{ row }">{{ row.price == null ? '—' : row.price.toFixed(2) }}</template>
+        </el-table-column>
+        <el-table-column label="今日涨跌" width="110" align="right">
+          <template #default="{ row }">
+            <span :class="pctClass(row.changePct)">{{ fmtPct(row.changePct) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-else description="暂无重仓股数据（债券/货币基金或尚未披露）" :image-size="60" />
+
+      <div class="est-tip">
+        估算仅覆盖季报披露的前十大重仓股，与基金实际净值涨跌可能存在偏差；净值每日收盘后更新，估算盘中每分钟刷新。
       </div>
     </div>
 
@@ -177,8 +244,12 @@ watch(flowDays, loadFlow)
 .code { color: #909399; font-size: 14px; font-weight: normal; }
 .latest { color: #606266; font-size: 13px; }
 
-.chart-toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
+.chart-toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; flex-wrap: wrap; }
 .chart-title { color: #606266; font-size: 13px; }
+.est-meta { color: #909399; font-size: 12px; }
+.est-big { font-size: 24px; font-weight: 700; }
+.hold-code { color: #c0c4cc; font-size: 12px; margin-left: 4px; }
+.est-tip { color: #c0c4cc; font-size: 11px; margin-top: 8px; }
 .period-tabs { display: flex; border: 1px solid #dcdfe6; border-radius: 6px; overflow: hidden; }
 .period-item {
   padding: 6px 18px;

@@ -16,6 +16,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<StockDaily> StockDailies => Set<StockDaily>();
     public DbSet<StockMinute> StockMinutes => Set<StockMinute>();
     public DbSet<FundNav> FundNavs => Set<FundNav>();
+    public DbSet<FundHolding> FundHoldings => Set<FundHolding>();
+    public DbSet<FundHoldingSync> FundHoldingSyncs => Set<FundHoldingSync>();
     public DbSet<MoneyFlowDaily> MoneyFlowDailies => Set<MoneyFlowDaily>();
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
     public DbSet<ShiborRate> ShiborRates => Set<ShiborRate>();
@@ -65,6 +67,20 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         b.Entity<FundNav>(e =>
         {
             e.HasIndex(x => new { x.FundCode, x.Date }).IsUnique();
+        });
+
+        b.Entity<FundHolding>(e =>
+        {
+            e.HasKey(x => new { x.FundCode, x.Rank });
+            e.Property(x => x.FundCode).HasMaxLength(12);
+            e.Property(x => x.StockSymbol).HasMaxLength(12);
+            e.Property(x => x.StockName).HasMaxLength(40);
+        });
+
+        b.Entity<FundHoldingSync>(e =>
+        {
+            e.HasKey(x => x.FundCode);
+            e.Property(x => x.FundCode).HasMaxLength(12);
         });
 
         b.Entity<MoneyFlowDaily>(e =>

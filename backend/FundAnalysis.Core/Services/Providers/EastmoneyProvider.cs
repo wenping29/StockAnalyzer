@@ -1,5 +1,8 @@
 using System.Globalization;
+using System.Net;
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using FundAnalysis.Models;
 
 namespace FundAnalysis.Services.Providers;
@@ -263,6 +266,212 @@ public class EastmoneyProvider(IHttpClientFactory factory) : IQuoteProvider
             page++;
         }
         return list;
+    }
+
+    /// <summary>
+    /// 基金重仓股（天天基金 F10 季报）。接口返回 JS 片段
+    /// （var apidata={ content:"&lt;table&gt;…",arryear:[…] }），HTML 内是当年各季度表格，
+    /// 只取第一张表（最新季度）。空持仓（债券/货币基金）返回空列表。
+    /// </summary>
+    public async Task<FundHoldingsSnapshot?> FetchFundHoldingsAsync(string fundCode, CancellationToken ct = default)
+    {
+        var url = $"https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={Uri.EscapeDataString(fundCode)}&topline=10&year=&month=&rt=0.1";
+        using var client = NewClient();
+        client.DefaultRequestHeaders.Referrer = new Uri($"https://fundf10.eastmoney.com/ccmx_{fundCode}.html");
+        var body = await GetWithRetryAsync(client, url, ct);
+        return ParseFundHoldings(body);
+    }
+
+    /// <summary>解析 F10 重仓股响应（internal 供单元测试直接验证解析）。</summary>
+    internal static FundHoldingsSnapshot? ParseFundHoldings(string body)
+    {
+        const string contentMarker = "content:\"";
+        var start = body.IndexOf(contentMarker, StringComparison.Ordinal);
+        if (start < 0) return null;
+        start += contentMarker.Length;
+        var end = body.IndexOf("\",arryear", start, StringComparison.Ordinal);
+        var html = end > start ? body[start..end] : body[start..];
+
+        DateTime? reportDate = null;
+        var dateMatch = Regex.Match(html, @"截止至：\s*<font[^>]*>\s*(\d{4}-\d{2}-\d{2})");
+        if (dateMatch.Success && DateTime.TryParse(dateMatch.Groups[1].Value, Cn, DateTimeStyles.None, out var d))
+            reportDate = d;
+
+        // 只解析第一张表（最新季报），后续季度（上季度/上上季度）忽略
+        var tableEnd = html.IndexOf("</table>", StringComparison.OrdinalIgnoreCase);
+        var tableHtml = tableEnd > 0 ? html[..tableEnd] : html;
+
+        var items = new List<FundHoldingItem>();
+        foreach (Match row in Regex.Matches(tableHtml, "<tr[^>]*>(.*?)</tr>", RegexOptions.Singleline))
+        {
+            var cells = Regex.Matches(row.Groups[1].Value, "<td[^>]*>(.*?)</td>", RegexOptions.Singleline)
+                .Select(m => WebUtility.HtmlDecode(Regex.Replace(m.Groups[1].Value, "<[^>]+>", "")).Trim())
+                .ToList();
+            if (cells.Count < 7) continue; // 表头使用 <th>，不会进入这里
+
+            // 股票代码单元格含行情链接：//quote.eastmoney.com/unify/r/1.600519
+            var href = Regex.Match(row.Groups[1].Value,
+                @"quote\.eastmoney\.com/unify/r/(\d+)\.([A-Za-z0-9]+)");
+            var symbol = href.Success ? href.Groups[2].Value : cells[1];
+            var secMarket = href.Success && int.TryParse(href.Groups[1].Value, out var market)
+                ? market
+                : symbol.Length == 5 ? 116 : symbol.StartsWith('6') ? 1 : 0;
+            if (string.IsNullOrWhiteSpace(symbol)) continue;
+
+            var weightText = cells[6].TrimEnd('%');
+            var weight = double.TryParse(weightText, NumberStyles.Any, Cn, out var w) ? w : 0;
+            var rank = int.TryParse(cells[0], out var r) ? r : items.Count + 1;
+
+            items.Add(new FundHoldingItem(rank, symbol, cells[2], secMarket, weight));
+        }
+
+        return new FundHoldingsSnapshot(reportDate, items);
+    }
+
+    /// <summary>
+    /// 批量实时行情：优先东财 push2（ulist，单次可带数十个 secid，按 50 个分片）；
+    /// 云服务器 IP 常被东财风控直接断连（Empty reply / ResponseEnded），此时自动降级到腾讯行情。
+    /// 键为 "市场.代码"，与 FundHoldingItem.SecId 一致；停牌/无价（f2 为 "-"）的标的跳过。
+    /// </summary>
+    public async Task<RealtimeQuoteBatch> FetchRealtimeQuotesAsync(
+        IReadOnlyCollection<(string Symbol, int SecMarket)> items, CancellationToken ct = default)
+    {
+        var pairs = items
+            .Where(x => !string.IsNullOrWhiteSpace(x.Symbol))
+            .Distinct()
+            .ToList();
+        if (pairs.Count == 0) return new RealtimeQuoteBatch([], QuoteSourceNames.Eastmoney);
+
+        var quotes = await TryEastmoneyQuotesAsync(pairs, ct);
+        if (quotes is not null) return new RealtimeQuoteBatch(quotes, QuoteSourceNames.Eastmoney);
+
+        var (fallback, anySucceeded) = await FetchTencentQuotesAsync(pairs, ct);
+        return new RealtimeQuoteBatch(
+            fallback, anySucceeded ? QuoteSourceNames.Tencent : QuoteSourceNames.None);
+    }
+
+    /// <summary>东财 push2 批量行情；任一请求失败返回 null，由调用方切换备用源。</summary>
+    private async Task<Dictionary<string, RealtimeQuote>?> TryEastmoneyQuotesAsync(
+        List<(string Symbol, int SecMarket)> pairs, CancellationToken ct)
+    {
+        var result = new Dictionary<string, RealtimeQuote>();
+        var secids = pairs.Select(x => $"{x.SecMarket}.{x.Symbol}").Distinct().ToList();
+
+        try
+        {
+            foreach (var chunk in secids.Chunk(50))
+            {
+                var url = $"https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f2,f3,f12,f13&secids={string.Join(",", chunk)}";
+                using var client = NewClient();
+                using var doc = JsonDocument.Parse(await GetWithRetryAsync(client, url, ct));
+                if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind == JsonValueKind.Null)
+                    continue;
+                if (!data.TryGetProperty("diff", out var diff) || diff.ValueKind != JsonValueKind.Array)
+                    continue;
+
+                foreach (var row in diff.EnumerateArray())
+                {
+                    var code = GetString(row, "f12");
+                    if (string.IsNullOrWhiteSpace(code)) continue;
+                    var market = GetInt(row, "f13");
+                    if (!row.TryGetProperty("f2", out var f2) || f2.ValueKind != JsonValueKind.Number) continue;
+                    var price = f2.GetDouble();
+                    if (price <= 0) continue; // 停牌 / 未上市
+                    var changePct = row.TryGetProperty("f3", out var f3) && f3.ValueKind == JsonValueKind.Number
+                        ? f3.GetDouble()
+                        : 0;
+                    result[$"{market}.{code}"] = new RealtimeQuote(price, changePct);
+                }
+            }
+            // 东财风控时偶发 200 + data:null，按失败处理交给备用源
+            return result.Count > 0 ? result : null;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return null; // 东财不可达：交给腾讯备用源
+        }
+    }
+
+    /// <summary>
+    /// 腾讯行情备用源（qt.gtimg.cn）。响应为 GBK 编码，按字节解码为 Latin1 后解析，
+    /// 字段以"代码"定位（现价=代码后第 1 段，昨收=第 2 段，涨跌幅=第 30 段），避免中文字段错位。
+    /// </summary>
+    private async Task<(Dictionary<string, RealtimeQuote> Quotes, bool AnySucceeded)> FetchTencentQuotesAsync(
+        List<(string Symbol, int SecMarket)> pairs, CancellationToken ct)
+    {
+        var secIdById = new Dictionary<string, string>();
+        foreach (var (symbol, market) in pairs)
+            secIdById[ToTencentId(symbol, market)] = $"{market}.{symbol}";
+
+        var result = new Dictionary<string, RealtimeQuote>();
+        var anySucceeded = false;
+        foreach (var chunk in secIdById.Keys.Chunk(60))
+        {
+            var url = "https://qt.gtimg.cn/q=" + string.Join(",", chunk);
+            using var client = NewClient();
+            client.DefaultRequestHeaders.Referrer = new Uri("https://gu.qq.com/");
+            string body;
+            try
+            {
+                body = Encoding.Latin1.GetString(await client.GetByteArrayAsync(url, ct));
+                anySucceeded = true;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                continue; // 单个分片失败不影响其余行情
+            }
+
+            foreach (var (secId, quote) in ParseTencentQuotes(body, secIdById))
+                result[secId] = quote;
+        }
+        return (result, anySucceeded);
+    }
+
+    /// <summary>东财 secid → 腾讯行情代码：1=sh，0=sz/北交所(bj)，116=hk。</summary>
+    private static string ToTencentId(string symbol, int secMarket) => secMarket switch
+    {
+        1 => "sh" + symbol,
+        116 => "hk" + symbol,
+        _ when symbol.StartsWith('4') || symbol.StartsWith('8') || symbol.StartsWith("92", StringComparison.Ordinal) => "bj" + symbol,
+        _ => "sz" + symbol,
+    };
+
+    /// <summary>
+    /// 解析腾讯行情响应：v_sh600519="1~贵州茅台~600519~1441.56~1452.00~...~涨跌额~涨跌幅~...
+    /// 代码字段可能因中文名中的 '~' 字节而位移，因此先定位代码再取相对字段。
+    /// </summary>
+    internal static Dictionary<string, RealtimeQuote> ParseTencentQuotes(
+        string body, IReadOnlyDictionary<string, string> secIdById)
+    {
+        var result = new Dictionary<string, RealtimeQuote>();
+        foreach (Match m in Regex.Matches(body, @"v_([a-z]{2}\w+)\s*=\s*""([^""]*)"""))
+        {
+            if (!secIdById.TryGetValue(m.Groups[1].Value, out var secId)) continue;
+            var parts = m.Groups[2].Value.Split('~');
+            var code = m.Groups[1].Value[2..];
+            var idx = Array.IndexOf(parts, code);
+            if (idx < 0 || parts.Length <= idx + 30) continue;
+            if (!double.TryParse(parts[idx + 1], NumberStyles.Any, Cn, out var price) || price <= 0) continue;
+
+            double changePct;
+            if (!double.TryParse(parts[idx + 30], NumberStyles.Any, Cn, out changePct))
+            {
+                // 涨跌幅缺失时用现价 / 昨收兜底
+                changePct = double.TryParse(parts[idx + 2], NumberStyles.Any, Cn, out var prev) && prev > 0
+                    ? (price - prev) / prev * 100
+                    : 0;
+            }
+            result[secId] = new RealtimeQuote(price, changePct);
+        }
+        return result;
     }
 
     /// <summary>带重试的 GET：连续快速请求容易触发东财服务端断连（ResponseEnded）。对瞬时错误仅重试 3 次、退避 150/300ms，上游真正不可达时快速失败，避免请求被长退避拖垮。取消信号不重试，立即上抛。</summary>

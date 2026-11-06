@@ -71,6 +71,36 @@ public class FundNav
     public double ChangePct { get; set; }
 }
 
+/// <summary>场外基金重仓股（天天基金 F10 季报披露的前十大，按报告期）。</summary>
+public class FundHolding
+{
+    /// <summary>基金代码（带 .F 后缀，与 StockBasic.Symbol 一致）。与 Rank 组成主键。</summary>
+    public string FundCode { get; set; } = "";
+    /// <summary>季报中的序号（1 起）。</summary>
+    public int Rank { get; set; }
+    public string StockSymbol { get; set; } = "";
+    public string StockName { get; set; } = "";
+    /// <summary>东财 secid 市场前缀：1=沪，0=深/北，116=港股。</summary>
+    public int SecMarket { get; set; }
+    /// <summary>占基金净值比例（%）。</summary>
+    public double WeightPct { get; set; }
+    /// <summary>季报截止日。</summary>
+    public DateTime ReportDate { get; set; }
+}
+
+/// <summary>
+/// 重仓股采集状态：每只基金一条，记录最近一次拉取时间。
+/// 空持仓（债券/货币基金）同样落库，避免每次查看都重复请求上游。
+/// </summary>
+public class FundHoldingSync
+{
+    public string FundCode { get; set; } = "";
+    public DateTime FetchedAt { get; set; } = DateTime.Now;
+    /// <summary>季报截止日；上游未返回时为 DateTime.MinValue。</summary>
+    public DateTime ReportDate { get; set; }
+    public int HoldingCount { get; set; }
+}
+
 /// <summary>每日资金流（主力/大单/中单/小单净流入，单位：元）。</summary>
 public class MoneyFlowDaily
 {

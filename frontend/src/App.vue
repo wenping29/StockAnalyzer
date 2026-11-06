@@ -78,7 +78,10 @@ function logout() {
   <el-container v-if="showLayout" style="height: 100%">
     <el-header class="layout-header">
       <span v-if="isMobile" class="hamburger" @click="drawerOpen = true">☰</span>
-      <div class="brand" @click="goMenu('/')">📈 资金流分析系统</div>
+      <div class="brand" @click="goMenu('/')">
+        <img src="/logo.svg" alt="" class="brand-logo" />
+        <span class="brand-text">资金流分析系统</span>
+      </div>
 
       <!-- 桌面横向导航 -->
       <div class="nav" v-if="!isMobile">
@@ -115,6 +118,7 @@ function logout() {
     <!-- 手机抽屉导航 -->
     <el-drawer v-model="drawerOpen" direction="ltr" size="240px" :with-header="false">
       <div class="drawer-user">
+        <img src="/logo.svg" alt="" class="drawer-logo" />
         <div class="drawer-user-name">{{ auth.user?.userName }}</div>
         <el-tag size="small" :type="auth.isAdmin ? 'danger' : auth.isVip ? 'warning' : 'info'">
           {{ auth.isAdmin ? '管理员' : auth.isVip ? 'VIP' : '普通用户' }}
@@ -165,7 +169,9 @@ function logout() {
   color: #fff;
   padding: 0 20px;
 }
-.brand { font-size: 17px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.brand { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.brand-logo { width: 28px; height: 28px; border-radius: 7px; display: block; }
+.brand-text { line-height: 1; }
 .nav { display: flex; gap: 18px; }
 .nav a { color: #c0c4cc; text-decoration: none; font-size: 15px; }
 .nav a.router-link-exact-active { color: #409eff; font-weight: 600; }
@@ -188,6 +194,7 @@ function logout() {
   border-bottom: 1px solid #ebeef5;
   margin-bottom: 8px;
 }
+.drawer-logo { width: 26px; height: 26px; border-radius: 7px; display: block; }
 .drawer-user-name { font-size: 16px; font-weight: 600; flex: 1; }
 .drawer-menu { display: flex; flex-direction: column; }
 .drawer-item {
@@ -206,7 +213,8 @@ function logout() {
 /* 手机端：导航可横向滑动，紧凑布局 */
 @media (max-width: 768px) {
   .layout-header { gap: 12px; padding: 0 12px; height: 48px; }
-  .brand { font-size: 13px; }
+  .brand { font-size: 13px; gap: 6px; }
+  .brand-logo { width: 24px; height: 24px; border-radius: 6px; }
   .nav { gap: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .nav::-webkit-scrollbar { display: none; }
   .nav a { font-size: 13px; white-space: nowrap; }

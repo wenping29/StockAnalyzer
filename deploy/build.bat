@@ -1,4 +1,4 @@
 F:
-cd F:\Project\zcoder\deploy\
+cd F:\Project\StockAnalyzer\deploy\
 powershell -File "pack.sh"
 pause

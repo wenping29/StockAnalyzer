@@ -12,6 +12,31 @@ public record MoneyFlowItem(DateTime Date, double MainNet, double LargeNet, doub
 
 public record FundNavItem(DateTime Date, double Nav, double AccNav, double ChangePct);
 
+/// <summary>基金重仓股条目。SecMarket 为东财 secid 市场前缀（1=沪，0=深/北，116=港）。</summary>
+public record FundHoldingItem(int Rank, string Symbol, string Name, int SecMarket, double WeightPct)
+{
+    /// <summary>东财 secid 唯一键，用于匹配实时行情。</summary>
+    public string SecId => $"{SecMarket}.{Symbol}";
+}
+
+/// <summary>基金重仓股快照：ReportDate 为季报截止日（上游未返回时为 null）。</summary>
+public record FundHoldingsSnapshot(DateTime? ReportDate, List<FundHoldingItem> Items);
+
+/// <summary>实时行情快照：最新价与当日涨跌幅（%）。</summary>
+public record RealtimeQuote(double Price, double ChangePct);
+
+/// <summary>批量实时行情 + 实际生效的数据源。键为 "市场.代码"（与 FundHoldingItem.SecId 一致）。</summary>
+public record RealtimeQuoteBatch(Dictionary<string, RealtimeQuote> Quotes, string Source);
+
+/// <summary>实时行情源标识：前端据此提示"东财被阻断、已切换备用源"。</summary>
+public static class QuoteSourceNames
+{
+    public const string Eastmoney = "Eastmoney";
+    public const string Tencent = "Tencent";
+    /// <summary>两个行情源都不可用（本次拿不到任何实时价）。</summary>
+    public const string None = "None";
+}
+
 /// <summary>
 /// 行情数据源统一接口。当前实现为东方财富公开接口（EastmoneyProvider），
 /// 之后接入 Tushare（TushareProvider）只需再实现一份，采集层代码不用动。
@@ -38,4 +63,10 @@ public interface IQuoteProvider
 
     /// <summary>拉取场外基金历史净值。</summary>
     Task<List<FundNavItem>> FetchFundNavAsync(string fundCode, int pageSize, CancellationToken ct = default);
+
+    /// <summary>拉取场外基金重仓股（季报前十大，含占净值比例）。无持仓的基金返回空列表。</summary>
+    Task<FundHoldingsSnapshot?> FetchFundHoldingsAsync(string fundCode, CancellationToken ct = default);
+
+    /// <summary>批量拉取实时行情（最新价/涨跌幅），并返回实际使用的数据源（东财 / 备用源）。</summary>
+    Task<RealtimeQuoteBatch> FetchRealtimeQuotesAsync(IReadOnlyCollection<(string Symbol, int SecMarket)> items, CancellationToken ct = default);
 }

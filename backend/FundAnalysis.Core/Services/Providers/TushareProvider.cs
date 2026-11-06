@@ -194,6 +194,15 @@ public class TushareProvider(IHttpClientFactory factory, IConfiguration config, 
     public Task<(double Value, double ChangePct)> FetchParityAsync(CancellationToken ct = default)
         => Task.FromResult((0d, 0d));
 
+    // 重仓股与实时行情仅东财提供（Tushare 无实时接口），返回空由调用方降级
+    public Task<FundHoldingsSnapshot?> FetchFundHoldingsAsync(string fundCode, CancellationToken ct = default)
+        => Task.FromResult<FundHoldingsSnapshot?>(null);
+
+    public Task<RealtimeQuoteBatch> FetchRealtimeQuotesAsync(
+        IReadOnlyCollection<(string Symbol, int SecMarket)> items, CancellationToken ct = default)
+        => Task.FromResult(new RealtimeQuoteBatch(
+            new Dictionary<string, RealtimeQuote>(), QuoteSourceNames.None));
+
     public async Task<List<FundNavItem>> FetchFundNavAsync(string fundCode, int pageSize, CancellationToken ct = default)
     {
         var data = await CallAsync("fund_nav",

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import type { WatchlistItem } from '../types'
+import type { FundEstimate, WatchlistItem } from '../types'
 import { addToWatchlist, fetchWatchlist } from '../api/quote'
+import { fetchFundEstimates } from '../api/funds'
 
 const router = useRouter()
 
@@ -27,6 +28,15 @@ const filters = reactive({ keyword: '', fundType: '' })
 const watchSymbols = ref<Set<string>>(new Set())
 // 点击行：右侧面板显示基金信息（跳转用"详情"按钮）
 const detailRow = ref<any>(null)
+
+// 当日重仓股估算（按基金代码索引），与列表分开展示，避免重仓股首次拉取拖慢列表
+const estimateMap = ref<Record<string, FundEstimate>>({})
+const estimateLoading = ref(false)
+let estimateSeq = 0
+let estimateTimer: ReturnType<typeof setInterval> | undefined
+
+const detailEstimate = computed(() =>
+  detailRow.value ? estimateMap.value[detailRow.value.symbol] ?? null : null)
 
 async function loadWatchlist() {
   try {
@@ -52,9 +62,34 @@ async function load() {
     const data = await res.json()
     funds.value = data.items
     total.value = data.total
+    loadEstimates()
   } finally {
     loading.value = false
   }
+}
+
+/** 拉取当前页基金的当日重仓股估算（列表先渲染，估算稍后填充）。 */
+async function loadEstimates() {
+  const symbols = funds.value.map((f) => f.symbol)
+  const seq = ++estimateSeq
+  if (symbols.length === 0) {
+    estimateMap.value = {}
+    return
+  }
+  estimateLoading.value = true
+  try {
+    const list = await fetchFundEstimates(symbols)
+    if (seq !== estimateSeq) return
+    estimateMap.value = Object.fromEntries(list.map((e) => [e.symbol, e]))
+  } catch {
+    if (seq === estimateSeq) estimateMap.value = {}
+  } finally {
+    if (seq === estimateSeq) estimateLoading.value = false
+  }
+}
+
+function reportDateText(d: string | null) {
+  return d ? d.slice(0, 10) : '—'
 }
 
 function search() {
@@ -100,6 +135,12 @@ onMounted(async () => {
     .then((r) => r.json())
     .then((r) => (fundTypes.value = r))
     .catch(() => {})
+  // 盘中估算随行情变化，每分钟刷新一次（重仓股走服务端缓存，只重取实时行情）
+  estimateTimer = setInterval(loadEstimates, 60_000)
+})
+
+onUnmounted(() => {
+  if (estimateTimer) clearInterval(estimateTimer)
 })
 </script>
 
@@ -154,6 +195,18 @@ onMounted(async () => {
               <span :class="pctClass(row.navChgPct)">{{ fmtPct(row.navChgPct) }}</span>
             </template>
           </el-table-column>
+          <el-table-column label="估算涨幅" width="115" align="right">
+            <template #default="{ row }">
+              <el-tooltip v-if="estimateMap[row.symbol]?.estimatedChangePct != null" placement="top"
+                :content="`按最新季报前十大重仓股加权 · 覆盖净值 ${estimateMap[row.symbol].coveredWeightPct.toFixed(2)}% · 报告期 ${reportDateText(estimateMap[row.symbol].reportDate)}`">
+                <span :class="pctClass(estimateMap[row.symbol].estimatedChangePct)">
+                  {{ fmtPct(estimateMap[row.symbol].estimatedChangePct) }}
+                </span>
+              </el-tooltip>
+              <span v-else-if="estimateLoading" class="dim">计算中…</span>
+              <span v-else class="dim">—</span>
+            </template>
+          </el-table-column>
           <el-table-column label="净值日期" width="120" align="right">
             <template #default="{ row }">{{ row.navDate ? row.navDate.slice(0, 10) : '—' }}</template>
           </el-table-column>
@@ -188,6 +241,30 @@ onMounted(async () => {
           <div class="dp-item"><span class="k">基金类型</span><span class="v">{{ detailRow.fundType ?? '—' }}</span></div>
           <div class="dp-item"><span class="k">净值日期</span><span class="v">{{ detailRow.navDate ? detailRow.navDate.slice(0, 10) : '—' }}</span></div>
         </div>
+
+        <!-- 当日重仓股估算 -->
+        <div class="dp-estimate" v-if="detailEstimate">
+          <div class="dp-est-head">
+            <span class="k">今日重仓股估算</span>
+            <span class="dp-est-pct" :class="pctClass(detailEstimate.estimatedChangePct)">
+              {{ fmtPct(detailEstimate.estimatedChangePct) }}
+            </span>
+          </div>
+          <div class="dp-est-sub">
+            覆盖净值 {{ detailEstimate.coveredWeightPct.toFixed(2) }}% · 报告期 {{ reportDateText(detailEstimate.reportDate) }}
+          </div>
+
+          <div class="dp-holds" v-if="detailEstimate.holdings.length">
+            <div class="dp-hold" v-for="h in detailEstimate.holdings" :key="`${h.secMarket}.${h.symbol}`">
+              <span class="hname" :title="h.name">{{ h.name }}</span>
+              <span class="hweight">{{ h.weightPct.toFixed(2) }}%</span>
+              <span class="hchg" :class="pctClass(h.changePct)">{{ fmtPct(h.changePct) }}</span>
+            </div>
+          </div>
+          <div class="dp-est-empty" v-else>暂无重仓股数据（债券/货币基金或尚未披露）</div>
+        </div>
+        <div class="dp-tip" v-else-if="estimateLoading">正在拉取重仓股…</div>
+
         <el-button type="primary" style="width: 100%; margin-top: 14px"
           @click="router.push(`/analysis/${detailRow.symbol}`)">进入净值走势分析 →</el-button>
         <div class="dp-tip">加入自选后自动采集历史净值</div>
@@ -204,7 +281,7 @@ onMounted(async () => {
 .list-layout { display: flex; gap: 16px; align-items: flex-start; }
 .table-card { flex: 1; min-width: 0; }
 .detail-panel {
-  width: 280px;
+  width: 320px;
   flex-shrink: 0;
   position: sticky;
   top: 12px;
@@ -220,6 +297,21 @@ onMounted(async () => {
 .dp-item .k { font-size: 11px; color: #909399; }
 .dp-item .v { font-size: 14px; font-weight: 600; margin-top: 2px; }
 .dp-tip { color: #c0c4cc; font-size: 11px; margin-top: 10px; text-align: center; }
+
+/* 当日重仓股估算 */
+.dp-estimate { margin-top: 12px; padding: 10px; background: #f8f9fb; border-radius: 8px; }
+.dp-est-head { display: flex; align-items: baseline; justify-content: space-between; }
+.dp-est-head .k { font-size: 12px; color: #606266; }
+.dp-est-pct { font-size: 20px; font-weight: 700; }
+.dp-est-sub { color: #909399; font-size: 11px; margin: 2px 0 8px; }
+.dp-holds { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; }
+.dp-hold { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.dp-hold .hname {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #303133;
+}
+.dp-hold .hweight { width: 48px; text-align: right; color: #909399; }
+.dp-hold .hchg { width: 58px; text-align: right; font-weight: 600; }
+.dp-est-empty { color: #c0c4cc; font-size: 11px; }
 
 @media (max-width: 1100px) {
   .list-layout { flex-direction: column; }

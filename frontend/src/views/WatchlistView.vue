@@ -3,15 +3,52 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import type { SearchItem, WatchlistItem, AlertRuleDto } from '../types'
+import type { SearchItem, WatchlistItem, AlertRuleDto, FundEstimate } from '../types'
 import {
   fetchWatchlist, addToWatchlist, removeFromWatchlist, searchSymbol,
 } from '../api/quote'
 import { fetchAlerts, createAlert, toggleAlert, deleteAlert } from '../api/alerts'
+import { fetchFundEstimates } from '../api/funds'
 
 const router = useRouter()
 const items = ref<WatchlistItem[]>([])
 const loading = ref(false)
+
+// ---------- 场外基金当日估值（按重仓股实时涨跌加权） ----------
+const estimateMap = ref<Record<string, FundEstimate>>({})
+const estimateLoading = ref(false)
+let estimateTimer: ReturnType<typeof setInterval> | undefined
+
+function isFundRow(row: WatchlistItem) {
+  return row.type === 'Fund' || row.symbol.endsWith('.F')
+}
+
+// 股票 / 基金 两个页签（ETF 与场外基金归入"基金"）
+function isFundAsset(row: WatchlistItem) {
+  return row.type === 'Fund' || row.type === 'Etf' || row.symbol.endsWith('.F')
+}
+const activeTab = ref<'stock' | 'fund'>('stock')
+const stockItems = computed(() => items.value.filter((w) => !isFundAsset(w)))
+const fundItems = computed(() => items.value.filter(isFundAsset))
+const tabItems = computed(() => (activeTab.value === 'stock' ? stockItems.value : fundItems.value))
+let tabInitialized = false
+
+async function loadEstimates() {
+  const symbols = items.value.filter(isFundRow).map((w) => w.symbol)
+  if (symbols.length === 0) {
+    estimateMap.value = {}
+    return
+  }
+  estimateLoading.value = true
+  try {
+    const list = await fetchFundEstimates(symbols)
+    estimateMap.value = Object.fromEntries(list.map((e) => [e.symbol, e]))
+  } catch {
+    estimateMap.value = {}
+  } finally {
+    estimateLoading.value = false
+  }
+}
 
 // ---------- 提醒 ----------
 const alerts = ref<AlertRuleDto[]>([])
@@ -98,6 +135,12 @@ async function load() {
   loading.value = true
   try {
     items.value = await fetchWatchlist()
+    // 首次加载时自动切到有内容的页签（例如只持有基金时直接看基金）
+    if (!tabInitialized && items.value.length) {
+      tabInitialized = true
+      activeTab.value = stockItems.value.length ? 'stock' : 'fund'
+    }
+    loadEstimates()
   } finally {
     loading.value = false
   }
@@ -127,7 +170,7 @@ let rankChart: echarts.ECharts | null = null
 
 function renderRank() {
   if (!rankChart) return
-  const rows = items.value
+  const rows = tabItems.value
     .filter((w) => w.monthReturnPct != null)
     .sort((a, b) => (a.monthReturnPct ?? 0) - (b.monthReturnPct ?? 0))
   if (!rows.length) {
@@ -166,18 +209,28 @@ onMounted(() => {
   window.addEventListener('resize', resize)
   load()
   loadAlerts()
+  // 场外基金估值盘中每分钟刷新（重仓股走服务端缓存，仅实时行情重取）
+  estimateTimer = setInterval(loadEstimates, 60_000)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resize)
+  if (estimateTimer) clearInterval(estimateTimer)
   rankChart?.dispose()
 })
 
-// 收益排行图：容器在 v-if 内，等数据渲染出 DOM 后再懒初始化
-watch(items, async () => {
-  if (!items.value.length) return
+// 收益排行图：容器在 v-if 内，等数据渲染出 DOM 后再懒初始化；切换页签时重建图表
+watch([items, activeTab], async () => {
   await nextTick()
-  if (!rankChart && rankEl.value) rankChart = echarts.init(rankEl.value!)
+  if (!tabItems.value.length) {
+    rankChart?.dispose()
+    rankChart = null
+    return
+  }
+  if (rankEl.value && (!rankChart || rankChart.getDom() !== rankEl.value)) {
+    rankChart?.dispose()
+    rankChart = echarts.init(rankEl.value)
+  }
   renderRank()
 })
 </script>
@@ -207,13 +260,6 @@ watch(items, async () => {
         <div class="sub">全部自选</div>
       </div>
     </div>
-
-    <!-- 近1月收益排行 -->
-    <div class="page-card" v-if="items.length">
-      <div class="chart-toolbar"><span class="chart-title">自选近1月收益排行</span></div>
-      <div ref="rankEl" style="width: 100%; height: 300px" />
-    </div>
-
     <!-- 提醒规则 -->
     <div class="page-card" v-if="alerts.length">
       <div class="chart-toolbar"><span class="chart-title">价格提醒（触发后自动停用，可重新启用）</span></div>
@@ -245,7 +291,6 @@ watch(items, async () => {
         </el-table-column>
       </el-table>
     </div>
-
     <!-- 自选列表 -->
     <div class="page-card">
       <div class="toolbar">
@@ -270,7 +315,12 @@ watch(items, async () => {
         <el-button :loading="loading" @click="load">刷新</el-button>
       </div>
 
-      <el-table :data="items" v-loading="loading" @row-click="(r: WatchlistItem) => router.push(`/analysis/${r.symbol}`)" row-class-name="row-click">
+      <el-tabs v-model="activeTab" class="watch-tabs">
+        <el-tab-pane :label="`股票 (${stockItems.length})`" name="stock" />
+        <el-tab-pane :label="`基金 (${fundItems.length})`" name="fund" />
+      </el-tabs>
+
+      <el-table :data="tabItems" height="520" v-loading="loading" @row-click="(r: WatchlistItem) => router.push(`/analysis/${r.symbol}`)" row-class-name="row-click">
         <el-table-column label="代码" width="100">
           <template #default="{ row }">{{ row.symbol }}</template>
         </el-table-column>
@@ -286,6 +336,25 @@ watch(items, async () => {
         <el-table-column label="涨跌幅" width="100" align="right">
           <template #default="{ row }">
             <span :class="pctClass(row.changePct)">{{ fmtPct(row.changePct) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column width="110" align="right">
+          <template #header>
+            <el-tooltip content="场外基金：按最新季报前十大重仓股实时涨跌加权估算（盘中每分钟刷新）" placement="top">
+              <span>今日估值</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <template v-if="isFundRow(row)">
+              <el-tooltip v-if="estimateMap[row.symbol]?.estimatedChangePct != null" placement="top"
+                :content="`按前十大重仓股加权 · 覆盖净值 ${estimateMap[row.symbol].coveredWeightPct.toFixed(2)}%`">
+                <span :class="pctClass(estimateMap[row.symbol].estimatedChangePct)">
+                  {{ fmtPct(estimateMap[row.symbol].estimatedChangePct) }}
+                </span>
+              </el-tooltip>
+              <span v-else class="dim">{{ estimateLoading ? '估算中…' : '—' }}</span>
+            </template>
+            <span v-else class="dim">—</span>
           </template>
         </el-table-column>
         <el-table-column label="近1月收益" width="110" align="right">
@@ -305,9 +374,20 @@ watch(items, async () => {
           </template>
         </el-table-column>
         <template #empty>
-          <el-empty description="自选为空，搜索添加标的，或等待首次自动采集（示例标的）" />
+          <el-empty v-if="items.length" :description="activeTab === 'stock' ? '暂无股票自选' : '暂无基金自选'" />
+          <el-empty v-else description="自选为空，搜索添加标的，或等待首次自动采集（示例标的）" />
         </template>
       </el-table>
+    </div>
+
+
+
+    <!-- 近1月收益排行 -->
+    <div class="page-card" v-if="tabItems.length">
+      <div class="chart-toolbar">
+        <span class="chart-title">{{ activeTab === 'stock' ? '自选股票' : '自选基金' }}近1月收益排行</span>
+      </div>
+      <div ref="rankEl" style="width: 100%; height: 300px" />
     </div>
 
     <!-- 创建提醒对话框 -->
@@ -343,4 +423,5 @@ watch(items, async () => {
 .chart-toolbar { display: flex; align-items: center; margin-bottom: 8px; }
 .chart-title { color: #606266; font-size: 13px; }
 .dim { color: #c0c4cc; font-size: 12px; }
+.watch-tabs { margin-bottom: 4px; }
 </style>

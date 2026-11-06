@@ -39,7 +39,8 @@ async function submit() {
 <template>
   <div class="login-wrap">
     <div class="login-box">
-      <h2>📈 基金/股票资金流分析系统</h2>
+      <img src="/logo.svg" alt="资金流分析系统" class="login-logo" />
+      <h2>基金/股票资金流分析系统</h2>
       <p class="tip">资金流入流出 · 多周期趋势 · 收益统计 · 权限分级</p>
 
       <el-tabs v-model="tab" stretch>
@@ -84,6 +85,14 @@ async function submit() {
 }
 @media (max-width: 420px) {
   .login-box { padding: 24px 20px 18px; }
+}
+.login-logo {
+  display: block;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 12px;
+  border-radius: 13px;
+  box-shadow: 0 6px 16px rgba(31, 45, 61, 0.25);
 }
 .login-box h2 { text-align: center; margin-bottom: 6px; font-size: 20px; }
 .tip { text-align: center; color: #909399; font-size: 12px; margin-bottom: 18px; }
