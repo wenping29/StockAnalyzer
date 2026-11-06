@@ -48,5 +48,5 @@ echo "== 附加部署文件 =="
 # tar -czf "$TARBALL" -C "$DIST" sp-server
 
 echo
-echo "完成：$TARBALL"
+# echo "完成：$TARBALL"
 echo "大小：$(du -h "$TARBALL" | cut -f1)"
